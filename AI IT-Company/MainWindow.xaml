@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="AI_IT_Company.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    Title="AI IT-Company">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Titlebar (кастомная, чтобы NavigationView занял всю высоту) -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="36" Background="Transparent">
+            <TextBlock Text="🤖 AI IT-Company"
+                       VerticalAlignment="Center"
+                       Margin="16,0,0,0"
+                       FontWeight="SemiBold"/>
+        </Grid>
+
+        <muxc:NavigationView
+            x:Name="NavView"
+            Grid.Row="1"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            PaneDisplayMode="Left"
+            OpenPaneLength="220"
+            SelectionChanged="NavView_SelectionChanged"
+            Loaded="NavView_Loaded">
+
+            <muxc:NavigationView.MenuItems>
+                <muxc:NavigationViewItem Content="Чат"       Tag="chat"      Icon="Message"/>
+                <muxc:NavigationViewItem Content="Дашборд"   Tag="dashboard" Icon="Home"/>
+                <muxc:NavigationViewItem Content="Агенты"    Tag="agents"    Icon="People"/>
+                <muxc:NavigationViewItem Content="Модели"    Tag="models"    Icon="Download"/>
+                <muxc:NavigationViewItem Content="Логи"      Tag="logs"      Icon="Document"/>
+            </muxc:NavigationView.MenuItems>
+
+            <muxc:NavigationView.FooterMenuItems>
+                <muxc:NavigationViewItem Content="Настройки" Tag="settings" Icon="Setting"/>
+            </muxc:NavigationView.FooterMenuItems>
+
+            <Frame x:Name="ContentFrame"/>
+        </muxc:NavigationView>
+    </Grid>
+</Window>

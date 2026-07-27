@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "AI IT-Company (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "AI IT-Company (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
