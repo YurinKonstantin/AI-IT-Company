@@ -103,12 +103,23 @@ namespace Core.Orchestration
                 foreach (var k in new[] { "backend_code", "frontend_code", "game_code", "tests_code", "fix_code" })
                     ctx.SharedData.Remove(k);
 
-                // Запускаем нужных кодеров параллельно по scope
-                var tasks = new List<Task>();
-                if (next.Scope.Contains("Backend")) tasks.Add(RunAgent(AgentRole.BackendCoder, ctx, ct));
-                if (next.Scope.Contains("Frontend")) tasks.Add(RunAgent(AgentRole.FrontendCoder, ctx, ct));
-                if (next.Scope.Contains("Game")) tasks.Add(RunAgent(AgentRole.GameCoder, ctx, ct));
-                await Task.WhenAll(tasks);
+                // Кодеры выполняются ПОСЛЕДОВАТЕЛЬНО, чтобы:
+                //   - не грузить слабый ПК двумя большими контекстами одновременно;
+                //   - каждый следующий кодер видел код предыдущего и опирался на его контракты.
+                // Порядок: Backend → Frontend → Game.
+                // Game обычно живёт отдельно от Backend/Frontend, но если сценарий смешанный —
+                // запускается последним и получает весь предыдущий контекст.
+
+                if (next.Scope.Contains("Backend"))
+                    await RunAgent(AgentRole.BackendCoder, ctx, ct);
+
+                if (next.Scope.Contains("Frontend"))
+                    await RunAgent(AgentRole.FrontendCoder, ctx, ct);
+
+                if (next.Scope.Contains("Game"))
+                    await RunAgent(AgentRole.GameCoder, ctx, ct);
+
+
 
                 if (next.Scope.Contains("Tests"))
                     await RunAgent(AgentRole.Tester, ctx, ct);

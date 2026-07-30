@@ -27,6 +27,9 @@ namespace Core.Agents
         public BackendCoderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
                         ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore,  logger) { }
         protected override string BuildUserPrompt(AgentContext ctx) => StageContextBuilder.Build(ctx, coderRole: "Кодер-Бэкенд (C#, сервисы, SQLite/EF Core, API)");
+
+      
+
         protected override Task<AgentResult> PostProcessAsync(AgentContext ctx, string output, CancellationToken ct)
         {
             ctx.SharedData["backend_code"] = output;
