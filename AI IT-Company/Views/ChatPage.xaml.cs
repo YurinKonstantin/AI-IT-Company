@@ -27,7 +27,7 @@ namespace Views
     public sealed partial class ChatPage : Page
     {
         public ChatViewModel ViewModel { get; }
-
+        //Создай WinUI 3 приложение для заметок с сохранением в SQLite. Функции: добавление, удаление, редактирование, поиск по заголовку.
         public ChatPage()
         {
             ViewModel = App.Host.Services.GetRequiredService<ChatViewModel>();

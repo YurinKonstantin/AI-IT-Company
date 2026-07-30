@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -27,10 +28,19 @@ namespace Core.Agents
                         ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore,  logger) { }
         protected override string BuildUserPrompt(AgentContext ctx) => StageContextBuilder.Build(ctx, coderRole: "Кодер-Бэкенд (C#, сервисы, SQLite/EF Core, API)");
         protected override Task<AgentResult> PostProcessAsync(AgentContext ctx, string output, CancellationToken ct)
-        { 
+        {
             ctx.SharedData["backend_code"] = output;
-            Debug.WriteLine("backend_code " + output);
-            return Task.FromResult(new AgentResult(true, output)); 
+            var count = CodeExtractor.Extract(output).Count(b => b.Path is not null);
+            if (count == 0)
+            {
+                var dumpPath = Path.Combine(
+                    ctx.OutputRoot ?? PathHelper.GetProjectOutputRoot(ctx.ProjectId),
+                    $"_raw_{Role}_{DateTime.Now:HHmmss}.txt");
+                try { File.WriteAllText(dumpPath, output); } catch { }
+                Logger.LogWarning("[{Role}] Не удалось извлечь блоки. Сырой ответ: {Path}", Role, dumpPath);
+            }
+            return Task.FromResult(new AgentResult(count > 0, output,
+                count == 0 ? "Не удалось извлечь блоки кода." : null));
         }
     }
 }

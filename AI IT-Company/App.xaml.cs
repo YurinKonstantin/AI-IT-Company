@@ -1,11 +1,12 @@
 ﻿using Ai;
-using ViewModels;
-
+using AI_IT_Company.ViewModels;
+using Core;
 using Core.Agents;
 using Core.Configuration;
 using Core.Contracts;
 using Core.Orchestration;
 using Data;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.UI.Xaml;
@@ -22,12 +23,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
+using ViewModels;
+using ViewModels;
 using Windows.ApplicationModel;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
-using ViewModels;
-using Core;
-using AI_IT_Company.ViewModels;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -58,7 +58,7 @@ namespace AI_IT_Company
                 // Провайдеры AI
                 s.AddSingleton<OllamaProvider>(_ => new OllamaProvider("http://localhost:11434"));
                 //s.AddSingleton<OnnxProvider>(_ => new OnnxProvider(
-                   // System.IO.Path.Combine(AppContext.BaseDirectory, "Models")));
+                // System.IO.Path.Combine(AppContext.BaseDirectory, "Models")));
 
                 // Фабрика — через ИНТЕРФЕЙС
                 s.AddSingleton<IAiProviderFactory, AiProviderFactory>();

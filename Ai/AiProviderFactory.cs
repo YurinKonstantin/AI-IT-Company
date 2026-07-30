@@ -18,14 +18,16 @@ public sealed class AiProviderFactory : IAiProviderFactory
     }
 
 
-    public IAiProvider Resolve(string source)
+    public IAiProvider Resolve(string source) => source?.ToLowerInvariant() switch
     {
-        if (!string.Equals(source, "Ollama", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogWarning(
-                "Источник '{Source}' временно не поддерживается — используется Ollama.",
-                source);
-        }
+        "ollama" => _ollama,
+        // "onnx"      => _onnx,       // включим на Шаге 2
+        // "phisilica" => _phiSilica,  // включим на Шаге 3
+        _ => FallbackToOllama(source)
+    };
+    private IAiProvider FallbackToOllama(string? src)
+    {
+        _logger.LogWarning("Источник '{Source}' пока не поддерживается — используется Ollama.", src);
         return _ollama;
     }
 }
