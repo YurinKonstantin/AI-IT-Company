@@ -2,6 +2,7 @@
 using Core.Contracts;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -13,20 +14,31 @@ public abstract class AgentBase : IAgent
 {
     private readonly IAiProviderFactory _factory;
     private readonly AgentConfigStore _configStore;
+    private readonly AgentPromptStore _promptStore;
     protected readonly ILogger Logger;
 
     public abstract AgentRole Role { get; }
     public virtual string Name => Role.ToString();
-    protected abstract string SystemPrompt { get; }
+
 
     public event EventHandler<string>? OnStream;
 
-    protected AgentBase(IAiProviderFactory factory, AgentConfigStore configStore, ILogger logger)
+    protected AgentBase(
+     IAiProviderFactory factory,
+     AgentConfigStore configStore,
+     AgentPromptStore promptStore,
+     ILogger logger)
     {
         _factory = factory;
         _configStore = configStore;
+        _promptStore = promptStore;
         Logger = logger;
     }
+    /// <summary>Дефолтный промпт из кода — реализация в наследнике.</summary>
+    protected abstract string DefaultSystemPrompt { get; }
+
+    /// <summary>Итоговый промпт: пользовательский, если задан, иначе дефолтный.</summary>
+    protected string SystemPrompt => _promptStore.Get(Role) ?? DefaultSystemPrompt;
     private static string GetDefaultOutputRoot(string projectId)
     {
         var root = Path.Combine(
@@ -39,7 +51,11 @@ public abstract class AgentBase : IAgent
         try
         {
             var settings = _configStore.Get(Role);
+            Debug.WriteLine("Agent " + Name + " " + "Model" + settings.ModelName);
+
             var provider = _factory.Resolve(settings.Source);
+            Debug.WriteLine("Agent " + Name + " provider " + provider.Name + " " + "Model" + settings.ModelName);
+
             var outputRoot = ctx.ProjectPath ?? GetDefaultOutputRoot(ctx.ProjectId);
             Directory.CreateDirectory(outputRoot);
             // ... остальное без изменений ...

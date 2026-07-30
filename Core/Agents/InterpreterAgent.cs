@@ -12,7 +12,7 @@ namespace Core.Agents;
 public sealed class InterpreterAgent : AgentBase
 {
     public override AgentRole Role => AgentRole.Interpreter;
-    protected override string SystemPrompt => """
+    protected override string DefaultSystemPrompt => """
         Ты — Интерпретатор. Верни СТРОГО JSON:
         {"mode":"CreateNew|Improve|FixError|Document|Analyze",
          "type":"WinUI|Api|Console|MonogameGame",
@@ -20,8 +20,8 @@ public sealed class InterpreterAgent : AgentBase
         Никакого другого текста.
     """;
 
-    public InterpreterAgent(IAiProviderFactory factory, AgentConfigStore configStore,
-                        ILogger<InterpreterAgent> logger) : base(factory, configStore, logger) { }
+    public InterpreterAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
+                        ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore, logger) { }
 
     protected override string BuildUserPrompt(AgentContext ctx)
         => $"Промпт пользователя: {ctx.UserPrompt}\nПуть к проекту: {ctx.ProjectPath ?? "нет"}";

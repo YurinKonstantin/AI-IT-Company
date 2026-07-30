@@ -150,7 +150,7 @@ public sealed class AgentConfigStore
     private static AgentSettings Default(AgentRole role) => role switch
     {
         // Интерпретатор — маленький, быстрый, детерминированный (JSON).
-        AgentRole.Interpreter => new() { Source = "Ollama", ModelName = "llama3", Temperature = 0.1 },
+        AgentRole.Interpreter => new() { Source = "Ollama", ModelName = "gemma4:12b", Temperature = 0.1 },
 
         // Архитектор — креативнее.
         AgentRole.Architect => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.5 },
@@ -164,13 +164,13 @@ public sealed class AgentConfigStore
         AgentRole.Tester => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.15 },
 
         // Builder — LLM почти не нужна, ставим лёгкую.
-        AgentRole.Builder => new() { Source = "Ollama", ModelName = "llama3", Temperature = 0.0 },
+        AgentRole.Builder => new() { Source = "Ollama", ModelName = "gemma4:12b", Temperature = 0.0 },
 
         // Исправитель — вдумчивый.
         AgentRole.ErrorFixer => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.1 },
 
         // Секретарь — тёплый текст.
-        AgentRole.Secretary => new() { Source = "Ollama", ModelName = "llama3", Temperature = 0.4 },
+        AgentRole.Secretary => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.4 },
 
         _ => new()
     };

@@ -4,6 +4,7 @@ using Core.Contracts;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -25,7 +26,7 @@ public sealed class SecretaryAgent : AgentBase
 {
     public override AgentRole Role => AgentRole.Secretary;
 
-    protected override string SystemPrompt => """
+    protected override string DefaultSystemPrompt => """
         Ты — Секретарь. Пишешь профессиональный итоговый отчёт на РУССКОМ языке в Markdown.
 
         СТРУКТУРА ОТЧЁТА (соблюдай ЖЁСТКО):
@@ -63,14 +64,29 @@ public sealed class SecretaryAgent : AgentBase
         Никакого другого текста.
     """;
 
-    public SecretaryAgent(IAiProviderFactory factory, AgentConfigStore configStore,
-                        ILogger<InterpreterAgent> logger) : base(factory, configStore, logger) { }
+    public SecretaryAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
+                        ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore, logger) { }
 
     protected override string BuildUserPrompt(AgentContext ctx)
     {
         // Готовим "сухие" факты. Модель на их основе напишет красивый отчёт.
         var facts = CollectFacts(ctx);
+        Debug.WriteLine("AgentResult " + $"""
+            Составь итоговый отчёт по следующим фактам.
+            Не выдумывай ничего, чего нет в фактах.
 
+            === Промпт пользователя ===
+            {ctx.UserPrompt}
+
+            === Факты проекта ===
+            {facts}
+
+            === Архитектура (from Architect) ===
+            {Truncate(ctx.SharedData.GetValueOrDefault("architecture", ""), 4000)}
+
+            === Диагноз последнего исправления (если было) ===
+            {ctx.SharedData.GetValueOrDefault("last_fix_analysis", "(исправления не понадобились)")}
+            """);
         return $"""
             Составь итоговый отчёт по следующим фактам.
             Не выдумывай ничего, чего нет в фактах.
@@ -90,23 +106,25 @@ public sealed class SecretaryAgent : AgentBase
     }
 
     protected override async Task<AgentResult> PostProcessAsync(
-        AgentContext ctx, string output, CancellationToken ct)
+       AgentContext ctx, string output, CancellationToken ct)
     {
-        // Извлекаем markdown-блок отчёта.
         var reportBlock = CodeExtractor.Extract(output)
             .FirstOrDefault(b => b.Path?.EndsWith("REPORT.md", StringComparison.OrdinalIgnoreCase) == true);
 
         string reportMarkdown = reportBlock.Code ?? BuildFallbackReport(ctx, output);
-
         ctx.SharedData["final_report"] = reportMarkdown;
 
-        // Сохраняем отчёт на диск рядом с проектом.
-        var projectRoot = ctx.ProjectPath ?? Path.Combine("Output", ctx.ProjectId);
+        var projectRoot = ctx.OutputRoot
+                       ?? ctx.ProjectPath
+                       ?? PathHelper.GetProjectOutputRoot(ctx.ProjectId);
+        PathHelper.EnsureDirectory(projectRoot);
+
         try
         {
-            Directory.CreateDirectory(projectRoot);
             var path = Path.Combine(projectRoot, "REPORT.md");
             await File.WriteAllTextAsync(path, reportMarkdown, ct);
+            Debug.WriteLine("SecretaryAgent " + reportMarkdown);
+            ctx.SharedData["report_path"] = path;
             Logger.LogInformation("[Secretary] Отчёт сохранён: {Path}", path);
         }
         catch (Exception ex)
@@ -114,10 +132,8 @@ public sealed class SecretaryAgent : AgentBase
             Logger.LogWarning(ex, "[Secretary] Не удалось сохранить REPORT.md");
         }
 
-        return new AgentResult(
-            Success: true,
-            Output: reportMarkdown,
-            Artifacts: new Dictionary<string, string> { ["report_path"] = "REPORT.md" });
+        return new AgentResult(true, reportMarkdown,
+            Artifacts: new Dictionary<string, string> { ["report_path"] = projectRoot });
     }
 
     // ---------- helpers ----------

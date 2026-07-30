@@ -20,7 +20,7 @@ public sealed class TesterAgent : AgentBase
 {
     public override AgentRole Role => AgentRole.Tester;
 
-    protected override string SystemPrompt => """
+    protected override string DefaultSystemPrompt => """
         Ты — Тестировщик. Пишешь юнит-тесты на xUnit для .NET 8+.
 
         ПРАВИЛА:
@@ -58,43 +58,37 @@ public sealed class TesterAgent : AgentBase
         - Никакого текста вне блоков кода.
     """;
 
-    public TesterAgent(IAiProviderFactory factory, AgentConfigStore configStore,
-                        ILogger<InterpreterAgent> logger) : base(factory, configStore, logger) { }
+    public TesterAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
+                        ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore, logger) { }
 
     protected override string BuildUserPrompt(AgentContext ctx)
     {
-        var architecture = ctx.SharedData.GetValueOrDefault("architecture", "(нет данных)");
+        var stageContext = StageContextBuilder.Build(ctx, coderRole: "Тестировщик (xUnit + FluentAssertions + Moq)");
+
         var backend = ctx.SharedData.GetValueOrDefault("backend_code", "");
         var frontend = ctx.SharedData.GetValueOrDefault("frontend_code", "");
         var game = ctx.SharedData.GetValueOrDefault("game_code", "");
 
-        var existingFiles = ctx.Files.Count > 0
-            ? string.Join("\n", ctx.Files.Where(f => f.EndsWith(".cs")).Take(30))
-            : "(новый проект)";
-
         return $"""
-            Режим: {ctx.Mode}
-            Тип проекта: {ctx.Type}
-            Задача пользователя: {ctx.UserPrompt}
+        {stageContext}
 
-            === Архитектура ===
-            {architecture}
+        === КОД ТЕКУЩЕГО ЭТАПА, КОТОРЫЙ НУЖНО ПОКРЫТЬ ТЕСТАМИ ===
 
-            === Существующие .cs файлы ===
-            {existingFiles}
+        --- Backend ---
+        {Trunc(backend, 6000)}
 
-            === Сгенерированный backend-код ===
-            {Truncate(backend, 8000)}
+        --- Frontend ---
+        {Trunc(frontend, 3000)}
 
-            === Сгенерированный frontend-код ===
-            {Truncate(frontend, 4000)}
+        --- Game ---
+        {Trunc(game, 3000)}
 
-            === Сгенерированный game-код ===
-            {Truncate(game, 4000)}
+        Сгенерируй только тесты, относящиеся к КОДУ ТЕКУЩЕГО ЭТАПА.
+        Тесты пиши в проект Tests/, чтобы не смешивать с основным кодом.
+        """;
 
-            Сгенерируй полный набор юнит-тестов (xUnit) для всей бизнес-логики.
-            Если это WinUI/Game — тестируй только сервисы и модели, не UI.
-            """;
+        static string Trunc(string s, int max)
+            => string.IsNullOrEmpty(s) ? "(пусто)" : s.Length <= max ? s : s[..max] + "\n…(обрезано)";
     }
 
     protected override Task<AgentResult> PostProcessAsync(AgentContext ctx, string output, CancellationToken ct)

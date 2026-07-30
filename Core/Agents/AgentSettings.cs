@@ -7,7 +7,7 @@ namespace Core.Agents
     public sealed class AgentSettings
     {
         public string Source { get; set; } = "Ollama";
-        public string ModelName { get; set; } = "llama3";
+        public string ModelName { get; set; } = "gemma4:12b";
         public int TimeoutSeconds { get; set; } = 0;
         public int MaxTokens { get; set; } = 0;
         public double Temperature { get; set; } = 0.7;

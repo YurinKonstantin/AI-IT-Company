@@ -3,6 +3,7 @@ using Core.Configuration;
 using Core.Contracts;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -21,7 +22,7 @@ public sealed class ErrorFixerAgent : AgentBase
 {
     public override AgentRole Role => AgentRole.ErrorFixer;
 
-    protected override string SystemPrompt => """
+    protected override string DefaultSystemPrompt => """
         Ты — Исправитель ошибок. Специалист по C# / .NET / WinUI 3 / Monogame.
 
         АЛГОРИТМ:
@@ -47,51 +48,38 @@ public sealed class ErrorFixerAgent : AgentBase
         - Писать текст вне блоков (кроме блока ```analysis).
     """;
 
-    public ErrorFixerAgent(IAiProviderFactory factory, AgentConfigStore configStore,
-                        ILogger<InterpreterAgent> logger) : base(factory, configStore, logger) { }
+    public ErrorFixerAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
+                        ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore, logger) { }
 
     protected override string BuildUserPrompt(AgentContext ctx)
     {
+        var stage = ctx.CurrentStage;
         var buildLog = ctx.SharedData.GetValueOrDefault("build_log", "");
-        var buildOk = ctx.SharedData.GetValueOrDefault("build_ok", "true") == "true";
-        var architecture = ctx.SharedData.GetValueOrDefault("architecture", "");
-        var previousAttempt = ctx.SharedData.GetValueOrDefault("fixer_attempt", "0");
-        var attempt = int.Parse(previousAttempt) + 1;
-        ctx.SharedData["fixer_attempt"] = attempt.ToString();
+        var attempt = ctx.SharedData.GetValueOrDefault("fixer_attempt", "0");
+        ctx.SharedData["fixer_attempt"] = (int.Parse(attempt) + 1).ToString();
 
-        // Собираем компактный сниппет всех сгенерированных/существующих файлов.
-        var codeContext = BuildCodeContext(ctx);
-
-        // Извлекаем именно строки-ошибки из лога сборки.
-        var errors = ExtractBuildErrors(buildLog);
-
-        var scenario = ctx.Mode == WorkMode.FixError && buildOk
-            ? "Пользователь описал ошибку рантайма — проанализируй код и найди причину."
-            : "Сборка провалилась — разбери лог компилятора и почини код.";
+        var stageBlock = stage is null ? "" : $"""
+        === ТЕКУЩИЙ ЭТАП ===
+        {stage.Id}. {stage.Name}
+        Deliverables: {string.Join("; ", stage.Deliverables)}
+        """;
 
         return $"""
-            Попытка исправления №{attempt}.
-            Сценарий: {scenario}
+        Попытка №{int.Parse(attempt) + 1}. Задача — вернуть код в собираемое состояние в рамках ТЕКУЩЕГО ЭТАПА.
+        Не выходи за scope этапа. Если ошибка вне scope — верни только затронутые файлы неизменёнными и укажи это в analysis.
 
-            === Описание задачи от пользователя ===
-            {ctx.UserPrompt}
+        {stageBlock}
 
-            === Ошибки компилятора (из лога) ===
-            {(errors.Count > 0 ? string.Join("\n", errors) : "(нет — вероятно, рантайм-ошибка)")}
+        === Полный лог сборки (последние 6000 симв.) ===
+        {TruncateTail(buildLog, 6000)}
 
-            === Полный лог сборки (последние 6000 симв.) ===
-            {TruncateTail(buildLog, 6000)}
+        === Код, доступный в этом этапе ===
+        {BuildCodeContext(ctx)}
 
-            === Архитектура проекта ===
-            {Truncate(architecture, 3000)}
-
-            === Код проекта ===
-            {codeContext}
-
-            Верни:
-            1) блок ```analysis``` с диагнозом.
-            2) ПОЛНЫЕ версии всех файлов, которые нужно изменить.
-            """;
+        Верни:
+        1) блок ```analysis``` — краткий диагноз;
+        2) ПОЛНЫЕ версии файлов, которые надо переписать.
+        """;
     }
 
     protected override Task<AgentResult> PostProcessAsync(AgentContext ctx, string output, CancellationToken ct)

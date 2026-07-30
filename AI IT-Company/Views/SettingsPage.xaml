@@ -5,12 +5,149 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:AI_IT_Company.Views"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:viewmodels="using:AI_IT_Company.ViewModels"
     mc:Ignorable="d">
 
-    <StackPanel Padding="24" Spacing="12">
-        <TextBlock Text="⚙ Настройки" Style="{ThemeResource TitleTextBlockStyle}"/>
-        <TextBox Header="Ollama URL" PlaceholderText="http://localhost:11434"/>
-        <TextBox Header="Путь к моделям (для будущей поддержки локальных)" IsReadOnly="True"/>
-    </StackPanel>
+    <ScrollViewer>
+        <StackPanel Padding="16" Spacing="24" MaxWidth="1100" HorizontalAlignment="Left">
+
+            <TextBlock Text="⚙ Настройки" Style="{ThemeResource TitleTextBlockStyle}"/>
+
+            <!-- ============= OLLAMA ============= -->
+            <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Ollama" FontSize="18" FontWeight="SemiBold"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBox PlaceholderText="http://localhost:11434"
+                                 Header="URL сервера"
+                                 Width="380"
+                                 Text="{x:Bind ViewModel.OllamaUrl, Mode=TwoWay}"/>
+                        <Button Content="💾 Сохранить"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Command="{x:Bind ViewModel.SaveOllamaCommand}"
+                                VerticalAlignment="Bottom"/>
+                        <Button Content="🔌 Проверить"
+                                Command="{x:Bind ViewModel.CheckOllamaCommand}"
+                                VerticalAlignment="Bottom"/>
+                    </StackPanel>
+                    <TextBlock Text="{x:Bind ViewModel.OllamaStatus, Mode=OneWay}"
+                               Opacity="0.85"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ============= TEMPLATES ============= -->
+            <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <StackPanel Spacing="10">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Шаблоны dotnet new"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                        <ProgressRing Grid.Column="1" Width="20" Height="20"
+                                           IsActive="{x:Bind ViewModel.IsTemplatesLoading, Mode=OneWay}"
+                                           VerticalAlignment="Center"/>
+                        <Button Grid.Column="2" Content="🔄 Проверить снова"
+                                Command="{x:Bind ViewModel.RefreshTemplatesCommand}"/>
+                    </Grid>
+
+                    <TextBlock Text="{x:Bind ViewModel.TemplatesStatus, Mode=OneWay}" Opacity="0.7"/>
+
+                     <ItemsRepeater ItemsSource="{x:Bind ViewModel.Templates}">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Orientation="Vertical" Spacing="6"/>
+                        </ItemsRepeater.Layout>
+                        <DataTemplate x:DataType="viewmodels:TemplateStatusItem">
+                            <Border Padding="10" CornerRadius="6"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock FontWeight="SemiBold">
+                                            <Run Text="{x:Bind DisplayName}"/>
+                                            <Run Text="  •  "/>
+                                            <Run Text="{x:Bind DotnetNewName}" FontFamily="Consolas"/>
+                                        </TextBlock>
+                                        <TextBlock Opacity="0.7" FontSize="12"
+                                                   Text="{x:Bind InstallPackage}"/>
+                                        <TextBlock Opacity="0.85" Text="{x:Bind Status, Mode=OneWay}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="⬇ Установить"
+                                            Command="{Binding ElementName=RootPage, Path=ViewModel.InstallTemplateCommand}"
+                                            CommandParameter="{x:Bind}"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
+            </Border>
+
+            <!-- ============= PROMPTS ============= -->
+            <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Системные промпты агентов"
+                               FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Opacity="0.7"
+                               Text="Оставьте поле пустым и сохраните — вернётся дефолтный промпт из кода."/>
+
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Prompts}">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Orientation="Vertical" Spacing="8"/>
+                        </ItemsRepeater.Layout>
+                        <DataTemplate x:DataType="viewmodels:PromptItem">
+                            <Expander HorizontalAlignment="Stretch">
+                                <Expander.Header>
+                                    <Grid ColumnSpacing="10" HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                        <Border Grid.Column="1"
+                                                Background="Orange"
+                                                CornerRadius="10" Padding="8,2"
+                                                Visibility="{x:Bind IsCustom, Mode=OneWay}">
+                                            <TextBlock Text="кастомный" FontSize="11" Foreground="Black"/>
+                                        </Border>
+                                    </Grid>
+                                </Expander.Header>
+
+                                <StackPanel Spacing="8" Padding="8,12">
+                                    <TextBox AcceptsReturn="True"
+                                             TextWrapping="Wrap"
+                                             MinHeight="160"
+                                             MaxHeight="360"
+                                             FontFamily="Consolas"
+                                             PlaceholderText="{x:Bind Placeholder}"
+                                             Text="{x:Bind Text, Mode=TwoWay}"/>
+
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Content="💾 Сохранить"
+                                                Command="{Binding ElementName=RootPage, Path=ViewModel.SavePromptCommand}"
+                                                CommandParameter="{x:Bind}"/>
+                                        <Button Content="↺ Сбросить к дефолту"
+                                                Command="{Binding ElementName=RootPage, Path=ViewModel.ResetPromptCommand}"
+                                                CommandParameter="{x:Bind}"/>
+                                        <TextBlock Text="{x:Bind Status, Mode=OneWay}"
+                                                   VerticalAlignment="Center" Opacity="0.75"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
+                        </DataTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
 </Page>

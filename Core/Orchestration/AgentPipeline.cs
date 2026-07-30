@@ -40,6 +40,7 @@ public sealed class AgentPipeline
             coders.Add(RunOneAsync(AgentRole.FrontendCoder, ctx, ct));
         if (ctx.Type == ProjectType.MonogameGame)
             coders.Add(RunOneAsync(AgentRole.GameCoder, ctx, ct));
+       
         await Task.WhenAll(coders);
 
         // 4) Тесты

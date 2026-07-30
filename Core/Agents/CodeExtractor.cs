@@ -6,14 +6,17 @@ namespace Core.Agents;
 public static class CodeExtractor
 {
     private static readonly Regex Rx = new(
-        @"```(?<lang>[a-zA-Z0-9+#-]+)(?::(?<path>[^\r\n]+))?\r?\n(?<code>.*?)```",
-        RegexOptions.Singleline | RegexOptions.Compiled);
+       @"```(?<lang>[a-zA-Z0-9+#-]+)(?<diff>:diff)?(?::(?<path>[^\r\n]+))?\r?\n(?<code>.*?)```",
+       RegexOptions.Singleline | RegexOptions.Compiled);
 
-    public static IEnumerable<(string Lang, string? Path, string Code)> Extract(string text)
+    public static IEnumerable<Block> Extract(string text)
     {
         foreach (Match m in Rx.Matches(text))
-            yield return (m.Groups["lang"].Value,
-                          m.Groups["path"].Success ? m.Groups["path"].Value.Trim() : null,
-                          m.Groups["code"].Value);
+            yield return new Block(
+                Lang: m.Groups["lang"].Value,
+                Path: m.Groups["path"].Success ? m.Groups["path"].Value.Trim() : null,
+                IsDiff: m.Groups["diff"].Success,
+                Code: m.Groups["code"].Value);
     }
+    public readonly record struct Block(string Lang, string? Path, bool IsDiff, string Code);
 }

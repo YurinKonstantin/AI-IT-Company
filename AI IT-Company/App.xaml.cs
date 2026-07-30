@@ -25,7 +25,9 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.ApplicationModel;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
-using AiItCompany.ViewModels;
+using ViewModels;
+using Core;
+using AI_IT_Company.ViewModels;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -45,6 +47,11 @@ namespace AI_IT_Company
             InitializeComponent();
             Host = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder().ConfigureServices((_, s) =>
             {
+                s.AddLogging(b => b.AddSerilog(new LoggerConfiguration()
+    .WriteTo.File(
+        System.IO.Path.Combine(PathHelper.LogsRoot, "app-.log"),
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 14).CreateLogger()));
                 // БД
                 s.AddDbContextFactory<AppDbContext>();
 
@@ -70,16 +77,32 @@ namespace AI_IT_Company
                 s.AddTransient<IAgent, ErrorFixerAgent>();
                 s.AddTransient<IAgent, SecretaryAgent>();
 
-                s.AddTransient<AgentPipeline>();
+                // s.AddTransient<AgentPipeline>();
+                s.AddTransient<StagedPipeline>();
                 s.AddTransient<AgentsConfigViewModel>();
                 s.AddTransient<ChatViewModel>();
+                s.AddSingleton<OllamaClient>(_ => new OllamaClient("http://localhost:11434"));
+                s.AddTransient<ModelsViewModel>();
+                s.AddTransient<IAgent, ScaffolderAgent>();
+                s.AddSingleton<AppSettingsStore>();
+                s.AddSingleton<AgentPromptStore>();
+                s.AddTransient<SettingsViewModel>();
+
             }).Build();
         }
 
-        protected override async void OnLaunched(LaunchActivatedEventArgs args)
+        protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
-            var store = Host.Services.GetRequiredService<AgentConfigStore>();
-            await store.InitializeAsync();
+            var appSettings = Host.Services.GetRequiredService<AppSettingsStore>();
+            await appSettings.InitializeAsync();
+
+            var url = appSettings.Get(AppSettingsStore.KeyOllamaUrl,
+                                      AppSettingsStore.KeyOllamaDefaultUrl);
+            Host.Services.GetRequiredService<OllamaClient>().SetBaseUrl(url);
+            // (Опционально) обновите OllamaProvider тем же URL, если он не читает у клиента.
+
+            await Host.Services.GetRequiredService<AgentConfigStore>().InitializeAsync();
+            await Host.Services.GetRequiredService<AgentPromptStore>().InitializeAsync();
 
             MainWindow = new MainWindow();
             MainWindow.Activate();

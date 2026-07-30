@@ -1,5 +1,5 @@
 using AI_IT_Company;
-using AiItCompany.ViewModels;
+using ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;

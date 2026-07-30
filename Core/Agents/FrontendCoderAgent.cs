@@ -1,11 +1,12 @@
-﻿using Core.Configuration;
+﻿using Core.Agents;
+using Core.Configuration;
 using Core.Contracts;
-using Core.Agents;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Core.Agents;
 
@@ -17,7 +18,7 @@ public sealed class FrontendCoderAgent : AgentBase
 {
     public override AgentRole Role => AgentRole.FrontendCoder;
 
-    protected override string SystemPrompt => """
+    protected override string DefaultSystemPrompt => """
         Ты — Кодер-Фронтенд для WinUI 3 (.NET 8, Windows App SDK 1.6+).
 
         ТРЕБОВАНИЯ:
@@ -44,40 +45,18 @@ public sealed class FrontendCoderAgent : AgentBase
         - Никакого текста вне блоков кода.
     """;
 
-    public FrontendCoderAgent(IAiProviderFactory factory, AgentConfigStore configStore,
+    public FrontendCoderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
                               ILogger<FrontendCoderAgent> logger)
-        : base(factory, configStore, logger) { }
+        : base(factory, configStore, promptStore, logger) { }
 
-    protected override string BuildUserPrompt(AgentContext ctx)
-    {
-        var architecture = ctx.SharedData.GetValueOrDefault("architecture", "(нет)");
-        var backendHint = ctx.SharedData.GetValueOrDefault("backend_code", "");
-        var existing = ctx.Files.Count > 0
-            ? string.Join("\n", ctx.Files.Where(f => f.EndsWith(".xaml") || f.EndsWith(".cs")).Take(20))
-            : "(новый проект)";
-
-        return $"""
-            Режим: {ctx.Mode}
-            Задача: {ctx.UserPrompt}
-
-            === Архитектура ===
-            {architecture}
-
-            === Существующие XAML/CS файлы ===
-            {existing}
-
-            === Контракты из backend-слоя (для DTO/сервисов) ===
-            {Truncate(backendHint, 4000)}
-
-            Сгенерируй/обнови XAML-страницы и ViewModel'и. Не переписывай сервисы бэкенда.
-            """;
-    }
+    protected override string BuildUserPrompt(AgentContext ctx) => StageContextBuilder.Build(ctx, coderRole: "Кодер-Фронтенд (WinUI 3, XAML, MVVM/CommunityToolkit.Mvvm)");
 
     protected override Task<AgentResult> PostProcessAsync(AgentContext ctx, string output, CancellationToken ct)
     {
         ctx.SharedData["frontend_code"] = output;
         var count = CodeExtractor.Extract(output).Count(b => b.Path is not null);
         Logger.LogInformation("[FrontendCoder] Сгенерировано файлов: {Count}", count);
+        Debug.WriteLine("frontend_code путь " + output);
         return Task.FromResult(new AgentResult(count > 0, output,
             count == 0 ? "Не удалось извлечь блоки кода." : null));
     }

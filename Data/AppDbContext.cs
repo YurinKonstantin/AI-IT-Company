@@ -7,9 +7,11 @@ namespace Data;
 
 public sealed class AppDbContext : DbContext
 {
-    public DbSet<ProjectRecord> Projects => Set<ProjectRecord>();
-    public DbSet<LogRecord> Logs => Set<LogRecord>();
+    public DbSet<AppSettingRecord> AppSettings => Set<AppSettingRecord>();
     public DbSet<AgentConfigRecord> AgentConfigs => Set<AgentConfigRecord>();
+    public DbSet<AgentPromptRecord> AgentPrompts => Set<AgentPromptRecord>();
+    public DbSet<ProjectRecord> Projects => Set<ProjectRecord>(); 
+    public DbSet<LogRecord> Logs => Set<LogRecord>();
 
     public AppDbContext() { }
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
@@ -18,19 +20,26 @@ public sealed class AppDbContext : DbContext
     {
         if (!o.IsConfigured)
         {
-            var dbPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "AiItCompany", "aiitcompany.db");
-            Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+            // Путь берём из PathHelper, чтобы всё лежало в одной корневой папке.
+            // Но Data не должна знать про Core — поэтому дублируем логику здесь.
+            var root = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "AiItCompany");
+            Directory.CreateDirectory(root);
+            var dbPath = Path.Combine(root, "aiitcompany.db");
             o.UseSqlite($"Data Source={dbPath}");
         }
     }
     protected override void OnModelCreating(ModelBuilder mb)
     {
+        mb.Entity<AppSettingRecord>().HasKey(x => x.Key);
         mb.Entity<AgentConfigRecord>().HasKey(x => x.Role);
+        mb.Entity<AgentPromptRecord>().HasKey(x => x.Role);
         mb.Entity<ProjectRecord>().HasKey(x => x.Id);
         mb.Entity<LogRecord>().HasKey(x => x.Id);
     }
+
+
 }
 
 
