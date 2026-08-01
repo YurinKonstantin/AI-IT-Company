@@ -1,6 +1,7 @@
 ﻿using Core.Agents;
 using Core.Configuration;
 using Core.Contracts;
+using Core.Services;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -25,47 +26,47 @@ namespace Core.Agents;
 public sealed class SecretaryAgent : AgentBase
 {
     public override AgentRole Role => AgentRole.Secretary;
-
+    ITranslationService _translator;
     protected override string DefaultSystemPrompt => """
-        Ты — Секретарь. Пишешь профессиональный итоговый отчёт на РУССКОМ языке в Markdown.
+    You are a Secretary. Write a professional final report in Markdown.
 
-        СТРУКТУРА ОТЧЁТА (соблюдай ЖЁСТКО):
-        # Итоговый отчёт по проекту
+    REPORT STRUCTURE (strictly follow):
+    # Final Project Report
 
-        ## 1. Описание
-        Краткое (3–5 предложений) описание того, что было сделано.
+    ## 1. Description
+    Brief (3–5 sentences) description of what was done.
 
-        ## 2. Режим работы
-        Создание / улучшение / исправление / документирование.
+    ## 2. Operating Mode
+    Creation / improvement / correction / documentation.
 
-        ## 3. Архитектура
-        Список ключевых модулей и их назначение (буллеты).
+    ## 3. Architecture
+    List of key modules and their purpose (bullets).
 
-        ## 4. Выполненные этапы
-        Таблица: | Агент | Действие | Результат |
+    ## 4. Completed Stages
+    Table: | Agent | Action | Result |
 
-        ## 5. Статистика
-        - Всего файлов: ...
-        - Файлов с тестами: ...
-        - Попыток авто-исправления: ...
-        - Итог сборки: успех / провал.
+    ## 5. Statistics
+    - Total files: ...
+    - Files with tests: ...
+    - Auto-correction attempts: ...
+    - Build result: success / failure.
 
-        ## 6. Инструкция по запуску
-        Пошагово: dotnet restore → dotnet build → dotnet run / dotnet test.
+    ## 6. Launch Instructions
+    Step by step: dotnet restore → dotnet build → dotnet run / dotnet test.
 
-        ## 7. Известные ограничения и рекомендации
-        Что ещё стоит улучшить.
+    ## 7. Known Limitations and Recommendations
+    What else could be improved.
 
-        ФОРМАТ ОТВЕТА:
-        Верни один блок:
-        ```markdown:REPORT.md
-        # ... полный отчёт ...
+    RESPONSE FORMAT:
+    Return one block:
+    ```markdown:REPORT.md
+    # ... full report ...
         ```
-        Никакого другого текста.
+       No other text.
     """;
 
-    public SecretaryAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
-                        ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore, logger) { }
+    public SecretaryAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore, ITranslationService translator,
+                        ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore, translator, logger) { _translator = translator; }
 
     protected override string BuildUserPrompt(AgentContext ctx)
     {
@@ -122,8 +123,7 @@ public sealed class SecretaryAgent : AgentBase
         try
         {
             var path = Path.Combine(projectRoot, "REPORT.md");
-            await File.WriteAllTextAsync(path, reportMarkdown, ct);
-            Debug.WriteLine("SecretaryAgent " + reportMarkdown);
+
             ctx.SharedData["report_path"] = path;
             Logger.LogInformation("[Secretary] Отчёт сохранён: {Path}", path);
         }
@@ -132,8 +132,15 @@ public sealed class SecretaryAgent : AgentBase
             Logger.LogWarning(ex, "[Secretary] Не удалось сохранить REPORT.md");
         }
 
-        return new AgentResult(true, reportMarkdown,
-            Artifacts: new Dictionary<string, string> { ["report_path"] = projectRoot });
+        var reportLocalized = await _translator.ToUserAsync(reportMarkdown, ct);
+        ctx.SharedData["final_report_original"] = reportMarkdown;
+        ctx.SharedData["final_report_localized"] = reportLocalized;
+
+        // Сохраняем оба файла:
+        await File.WriteAllTextAsync(Path.Combine(projectRoot, "REPORT.md"), reportMarkdown, ct);
+        await File.WriteAllTextAsync(Path.Combine(projectRoot, "REPORT.localized.md"), reportLocalized, ct);
+
+        return new AgentResult(true, reportLocalized, Artifacts: new Dictionary<string, string> { ["report_path"] = projectRoot });
     }
 
     // ---------- helpers ----------
@@ -154,7 +161,8 @@ public sealed class SecretaryAgent : AgentBase
             ("frontend_code", "Frontend"),
             ("game_code", "Game"),
             ("tests_code", "Tests"),
-            ("fix_code", "Fixes")
+            ("fix_code", "Fixes"),
+            ("fullstack_code", "fullstack")
         })
         {
             if (!ctx.SharedData.TryGetValue(key, out var blob)) continue;

@@ -1,5 +1,6 @@
 ﻿using Core.Configuration;
 using Core.Contracts;
+using Core.Services;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
@@ -19,15 +20,27 @@ public abstract class AgentBase : IAgent
 
     public abstract AgentRole Role { get; }
     public virtual string Name => Role.ToString();
-
+    ITranslationService _translator;
 
     public event EventHandler<string>? OnStream;
 
     protected AgentBase(
      IAiProviderFactory factory,
      AgentConfigStore configStore,
-     AgentPromptStore promptStore,
+     AgentPromptStore promptStore, ITranslationService translation,
      ILogger logger)
+    {
+        _factory = factory;
+        _configStore = configStore;
+        _promptStore = promptStore;
+        _translator = translation;
+        Logger = logger;
+    }
+    protected AgentBase(
+    IAiProviderFactory factory,
+    AgentConfigStore configStore,
+    AgentPromptStore promptStore,
+    ILogger logger)
     {
         _factory = factory;
         _configStore = configStore;
@@ -67,7 +80,7 @@ public abstract class AgentBase : IAgent
             var sb = new StringBuilder();
             var req = new AiRequest(
                 ModelName: settings.ModelName,
-                SystemPrompt: SystemPrompt,
+                SystemPrompt: GetSystemPromptForRun(ct),
                 UserPrompt: userPrompt,
                 Temperature: settings.Temperature,
                 MaxTokens: settings.MaxTokens,
@@ -96,4 +109,13 @@ public abstract class AgentBase : IAgent
 
     protected virtual Task<AgentResult> PostProcessAsync(AgentContext ctx, string output, CancellationToken ct)
         => Task.FromResult(new AgentResult(true, output));
+    protected string GetSystemPromptForRun(CancellationToken ct)
+    {
+        var custom = _promptStore.Get(Role);
+        if (custom is null) return DefaultSystemPrompt;                // уже английский
+
+        // Есть кастомный — переводим на рабочий язык.
+        // Синхронный wrapper над async — оправдан только внутри выполнения агента (не UI-thread).
+        return _translator.ToWorkingAsync(custom, ct).GetAwaiter().GetResult();
+    }
 }

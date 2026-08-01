@@ -1,4 +1,5 @@
 ﻿using AI_IT_Company;
+using AI_IT_Company.Services;
 using Build;
 using Build;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -6,8 +7,11 @@ using CommunityToolkit.Mvvm.Input;
 using Core;
 using Core.Contracts;
 using Core.Orchestration;
+using Core.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -15,138 +19,98 @@ using System.IO;
 using System.Reflection.Metadata.Ecma335;
 using System.Threading;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Pickers;
 
 namespace ViewModels;
 
 public partial class ChatViewModel : ObservableObject
 {
-  //  private readonly AgentPipeline _pipeline;
-    private readonly DispatcherQueue _ui;
-    private readonly StagedPipeline _pipeline;
+    public PipelineRunService Runner { get; }
 
-    public ObservableCollection<PipelineEvent> Events { get; } = new();
-
-    [ObservableProperty] private int modeIndex;
     [ObservableProperty] private string prompt = "";
     [ObservableProperty] private string projectPath = "";
+    [ObservableProperty] private int modeIndex;   // 0..3
+    private readonly ITranslationService _translator;
 
-    // Инфо о текущем/последнем запуске.
-    [ObservableProperty] private string currentProjectId = "";
-    [ObservableProperty] private string currentOutputRoot = "";
-    [ObservableProperty] private bool hasActiveProject;
-    [ObservableProperty] private bool isRunning;
-
-    public ChatViewModel(StagedPipeline pipeline)
+    public ChatViewModel(PipelineRunService runner, ITranslationService translator)
     {
-        _pipeline = pipeline;
-        _ui = DispatcherQueue.GetForCurrentThread()
-              ?? throw new InvalidOperationException("ChatViewModel должен создаваться на UI-потоке.");
+        Runner = runner;
+        _translator = translator;
     }
 
-    [RelayCommand(CanExecute = nameof(CanRun))]
+    [RelayCommand]
+    private async Task PickFolderAsync()
+    {
+        var picker = new FolderPicker();
+        picker.FileTypeFilter.Add("*");
+        //var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(((App)App.Current).MainWindow);
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindowRef);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder is not null) ProjectPath = folder.Path;
+    }
+
+    [RelayCommand]
     private async Task RunAsync()
     {
-        IsRunning = true;
-        RunCommand.NotifyCanExecuteChanged();
-        Events.Clear();
+
+        if (Runner.IsRunning) return;
+        if (string.IsNullOrWhiteSpace(Prompt)) return;
+        // Переводим пользовательский промпт на рабочий язык агентов.
+        var translated = await _translator.ToWorkingAsync(Prompt);
 
         var projectId = Guid.NewGuid().ToString("N")[..8];
-        var mode = ModeIndex switch
-        {
-            1 => WorkMode.Improve,
-            2 => WorkMode.FixError,
-            3 => WorkMode.Document,
-            _ => WorkMode.CreateNew
-        };
-
         // Гарантированно создаём и получаем путь.
         var outputRoot = string.IsNullOrWhiteSpace(ProjectPath)
             ? PathHelper.GetProjectOutputRoot(projectId)
             : PathHelper.EnsureDirectory(ProjectPath);
 
-        CurrentProjectId = projectId;
-        CurrentOutputRoot = outputRoot;
-        HasActiveProject = true;
+        
+       
+
 
         var ctx = new AgentContext
         {
             ProjectId = projectId,
-            UserPrompt = Prompt,
-            ProjectPath = string.IsNullOrWhiteSpace(ProjectPath) ? null : ProjectPath,
-            OutputRoot = outputRoot,
-            Mode = mode
+            UserPrompt = translated,
+            ProjectPath = outputRoot,
+            Mode = ModeIndex switch
+            {
+                1 => WorkMode.Improve,
+                2 => WorkMode.FixError,
+                3 => WorkMode.Document,
+                _ => WorkMode.CreateNew
+            }
         };
-
         if (ctx.ProjectPath is not null)
         {
             var (type, files) = ProjectScanner.Scan(ctx.ProjectPath);
             if (Enum.TryParse<ProjectType>(type, out var pt)) ctx.Type = pt;
             ctx.Files.AddRange(files);
         }
-
-        var reader = _pipeline.Events.Reader;
-        _ = Task.Run(() => _pipeline.RunAsync(ctx, CancellationToken.None));
-
-        try
-        {
-            await foreach (var ev in reader.ReadAllAsync())
-            {
-                _ui.TryEnqueue(() => Events.Add(ev));
-
-                // Автоматически откроем папку после сохранения отчёта.
-                if (ev.Role == AgentRole.Secretary && ev.Kind == "done")
-                    _ui.TryEnqueue(OpenFolder);
-            }
-
-
-        }
-        finally
-        {
-            IsRunning = false;
-            _ui.TryEnqueue(() => RunCommand.NotifyCanExecuteChanged());
-        }
+        ctx.SharedData["user_prompt_original"] = Prompt;
+        await Runner.StartAsync(ctx);
     }
 
-    private bool CanRun() => !IsRunning && !string.IsNullOrWhiteSpace(Prompt);
-
-    partial void OnPromptChanged(string value) => RunCommand.NotifyCanExecuteChanged();
-
-    [RelayCommand(CanExecute = nameof(HasActiveProject))]
-    private void OpenFolder()
-    {
-        if (string.IsNullOrWhiteSpace(CurrentOutputRoot)) return;
-        var path = PathHelper.EnsureDirectory(CurrentOutputRoot);
-
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = path,
-            UseShellExecute = true
-        });
-    }
-
-    partial void OnHasActiveProjectChanged(bool value)
-        => OpenFolderCommand.NotifyCanExecuteChanged();
+    [RelayCommand]
+    private void Stop() => Runner.Stop();
 
     [RelayCommand]
     private void CopyProjectId()
     {
-        if (string.IsNullOrWhiteSpace(CurrentProjectId)) return;
-        var pkg = new Windows.ApplicationModel.DataTransfer.DataPackage();
-        pkg.SetText(CurrentProjectId);
-        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(pkg);
+        if (string.IsNullOrEmpty(Runner.CurrentProjectId)) return;
+        var pkg = new DataPackage();
+        pkg.SetText(Runner.CurrentProjectId);
+        Clipboard.SetContent(pkg);
     }
 
     [RelayCommand]
-    private async Task PickFolderAsync()
+    private void OpenFolder()
     {
-        var picker = new Windows.Storage.Pickers.FolderPicker();
-        picker.FileTypeFilter.Add("*");
-
-        var mainWindow = ((App)Application.Current).MainWindow;
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(mainWindow);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        var folder = await picker.PickSingleFolderAsync();
-        if (folder is not null) ProjectPath = folder.Path;
+        var p = Runner.CurrentOutputRoot;
+        if (string.IsNullOrEmpty(p)) return;
+        try { Process.Start(new ProcessStartInfo("explorer.exe", $"\"{p}\"") { UseShellExecute = true }); }
+        catch { }
     }
 }

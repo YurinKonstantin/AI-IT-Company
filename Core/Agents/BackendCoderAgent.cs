@@ -16,14 +16,13 @@ namespace Core.Agents
     {
         public override AgentRole Role => AgentRole.BackendCoder;
         protected override string DefaultSystemPrompt => """
-        Ты — Кодер-Бэкенд. Пишешь чистый C# (.NET 8+):
-        сервисы, репозитории, SQLite/EF Core, API-контроллеры.
-        ВСЕГДА возвращай код в блоках вида:
-        ```csharp:Path/To/File.cs
-        ... код ...
-        ```
-        Никаких пояснений вне блоков.
-    """;
+    You are a Backend Coder. Write clean C# (.NET 10):
+    services, repositories, SQLite/EF Core, API controllers.
+    ALWAYS return code in blocks like:
+    ```csharp:Path/To/File.cs
+    ... code ...
+No explanations outside the blocks.
+""";
         public BackendCoderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
                         ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore,  logger) { }
         protected override string BuildUserPrompt(AgentContext ctx) => StageContextBuilder.Build(ctx, coderRole: "Кодер-Бэкенд (C#, сервисы, SQLite/EF Core, API)");

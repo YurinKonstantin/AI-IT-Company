@@ -1,3 +1,5 @@
+using AI_IT_Company.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -23,9 +25,19 @@ namespace AI_IT_Company.Views
     /// </summary>
     public sealed partial class LogsPage : Page
     {
+        public LogsViewModel ViewModel { get; }
+
         public LogsPage()
         {
+            ViewModel = App.Host.Services.GetRequiredService<LogsViewModel>();
             InitializeComponent();
+
+            // Автопрокрутка вниз при обновлении содержимого.
+            ViewModel.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(LogsViewModel.Content) && ViewModel.AutoRefresh)
+                    DispatcherQueue.TryEnqueue(() => LogScroll.ChangeView(null, double.MaxValue, null, disableAnimation: true));
+            };
         }
     }
 }

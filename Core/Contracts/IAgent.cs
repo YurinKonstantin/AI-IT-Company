@@ -6,10 +6,18 @@ namespace Core.Contracts;
 
 public enum AgentRole
 {
-    Interpreter, Architect,
-    BackendCoder, FrontendCoder, GameCoder,
-    Tester, Builder, ErrorFixer, Secretary,
-    Scaffolder
+    Interpreter,
+    Architect,
+    BackendCoder,
+    FrontendCoder,
+    GameCoder,
+    FullstackCoder,
+    Tester,
+    Builder,
+    ErrorFixer,
+    Secretary,
+    Scaffolder,
+    Translator
 }
 
 public interface IAgent

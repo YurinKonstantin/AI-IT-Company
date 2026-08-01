@@ -17,10 +17,11 @@ namespace Core.Agents
     public sealed class BuilderAgent : AgentBase
     {
         public override AgentRole Role => AgentRole.Builder;
-        protected override string DefaultSystemPrompt => "Sink-агент, LLM не используется активно.";
+        protected override string DefaultSystemPrompt => "Sink-agent, LLM is not actively used.";
+        private readonly Configuration.AppSettingsStore _settings;
 
-        public BuilderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
-                    ILogger<BuilderAgent> logger) : base(factory, configStore, promptStore, logger) { }
+        public BuilderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore, Configuration.AppSettingsStore settings,
+                    ILogger<BuilderAgent> logger) : base(factory, configStore, promptStore, logger) { _settings = settings; }
 
         public override async Task<AgentResult> ExecuteAsync(AgentContext ctx, CancellationToken ct)
         {
@@ -44,27 +45,36 @@ namespace Core.Agents
 
             // Пишем файлы, полученные от кодеров и исправителя.
             int filesWritten = 0;
-            foreach (var key in new[] { "backend_code", "frontend_code", "game_code", "tests_code", "fix_code" })
+            var coderMode = _settings.GetCoderMode();
+            string[] masRole = new[] { "backend_code", "frontend_code", "game_code", "tests_code", "fix_code" };
+            if (coderMode == CoderMode.Unified)
             {
-                if (!ctx.SharedData.TryGetValue(key, out var blob)) continue;
+                masRole = new[] { "fullstack_code", "game_code", "tests_code", "fix_code" };
+            }
+            foreach (var key in masRole)
+            {
+               
+                    if (!ctx.SharedData.TryGetValue(key, out var blob)) continue;
 
-                foreach (var b in CodeExtractor.Extract(blob))
-                {
-                    if (b.Path is null) continue;
-                    var full = Path.Combine(outputRoot, b.Path);
-                    var dir = Path.GetDirectoryName(full);
-                    if (!string.IsNullOrEmpty(dir)) PathHelper.EnsureDirectory(dir);
+                    foreach (var b in CodeExtractor.Extract(blob))
+                    {
+                        if (b.Path is null) continue;
+                        var full = Path.Combine(outputRoot, b.Path);
+                        var dir = Path.GetDirectoryName(full);
+                        if (!string.IsNullOrEmpty(dir)) PathHelper.EnsureDirectory(dir);
 
-                    if (b.IsDiff && b.Path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) && File.Exists(full))
-                    {
-                        await CsprojDiffApplier.ApplyAsync(full, b.Code, ct);
+                        if (b.IsDiff && b.Path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) && File.Exists(full))
+                        {
+                            await CsprojDiffApplier.ApplyAsync(full, b.Code, ct);
+                        }
+                        else
+                        {
+                            await File.WriteAllTextAsync(full, b.Code, ct);
+                        }
+                        filesWritten++;
                     }
-                    else
-                    {
-                        await File.WriteAllTextAsync(full, b.Code, ct);
-                    }
-                    filesWritten++;
-                }
+                
+                
             }
             Logger.LogInformation("[Builder] Записано файлов: {Count}", filesWritten);
 

@@ -6,11 +6,165 @@
     xmlns:local="using:AI_IT_Company.Views"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
     mc:Ignorable="d">
 
-    <StackPanel Padding="24" Spacing="8">
-        <TextBlock Text="📊 Дашборд" Style="{ThemeResource TitleTextBlockStyle}"/>
-        <TextBlock Opacity="0.7"
-               Text="Здесь будет статус агентов, прогресс-бар и активные проекты."/>
-    </StackPanel>
+    <ScrollViewer>
+        <Grid Padding="24" RowSpacing="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="📊 Дашборд" Style="{ThemeResource TitleTextBlockStyle}"/>
+
+            <!-- Активный проект -->
+            <InfoBar Grid.Row="1"
+                          IsOpen="{x:Bind ViewModel.Runner.HasActiveProject, Mode=OneWay}"
+                          IsClosable="False"
+                          Severity="Informational"
+                          Title="Активный проект">
+                <InfoBar.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4">
+                        <TextBlock Text="ID:" Opacity="0.7"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.CurrentProjectId, Mode=OneWay}"
+                                   FontFamily="Consolas" FontWeight="SemiBold"/>
+                        <TextBlock Text="Начат:" Opacity="0.7"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.StartedAt, Mode=OneWay}"/>
+                    </StackPanel>
+                </InfoBar.Content>
+                <muxc:InfoBar.ActionButton>
+                    <!--<StackPanel Orientation="Horizontal" Spacing="6">-->
+                        <!--<Button Content="📂 Папка"
+                                Command="{x:Bind ViewModel.OpenFolderCommand}"/>-->
+                        <Button Content="⏹ Остановить"
+                                Command="{x:Bind ViewModel.StopCommand}"
+                                IsEnabled="{x:Bind ViewModel.Runner.IsRunning, Mode=OneWay}"/>
+                    <!--</StackPanel>-->
+                </muxc:InfoBar.ActionButton>
+            </InfoBar>
+
+            <!-- Заглушка, если проекта нет -->
+            <InfoBar Grid.Row="1"
+                          IsOpen="{x:Bind ViewModel.Runner.HasActiveProject, Mode=OneWay,
+                                   Converter={StaticResource BoolNegationConverter}}"
+                          IsClosable="False" Severity="Success"
+                          Title="Готов к работе"
+                          Message="Перейдите в раздел «Чат», чтобы запустить конвейер."/>
+
+            <!-- Прогресс этапов -->
+            <StackPanel Grid.Row="2" Spacing="6"
+                        Visibility="{x:Bind ViewModel.Runner.HasActiveProject, Mode=OneWay}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Прогресс этапов:" FontWeight="SemiBold"/>
+                    <TextBlock Text="{x:Bind ViewModel.Runner.CompletedStages, Mode=OneWay}"/>
+                    <TextBlock Text="из"/>
+                    <TextBlock Text="{x:Bind ViewModel.Runner.TotalStages, Mode=OneWay}"/>
+                    <TextBlock Text="•"/>
+                    <TextBlock Text="{x:Bind ViewModel.Runner.ProgressPercent, Mode=OneWay}"/>
+                    <TextBlock Text="%"/>
+                </StackPanel>
+                <ProgressBar Minimum="0" Maximum="100"
+                             Value="{x:Bind ViewModel.Runner.ProgressPercent, Mode=OneWay}"/>
+            </StackPanel>
+
+            <!-- Плитки статистики -->
+            <Grid Grid.Row="3" ColumnSpacing="12"
+                  Visibility="{x:Bind ViewModel.Runner.HasActiveProject, Mode=OneWay}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Padding="16" CornerRadius="10"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <StackPanel>
+                        <TextBlock Text="Успешно" Opacity="0.7"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.CompletedStages, Mode=OneWay}"
+                                   FontSize="28" FontWeight="Bold" Foreground="LimeGreen"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Padding="16" CornerRadius="10"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <StackPanel>
+                        <TextBlock Text="Провалено" Opacity="0.7"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.FailedStages, Mode=OneWay}"
+                                   FontSize="28" FontWeight="Bold" Foreground="OrangeRed"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Padding="16" CornerRadius="10"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <StackPanel>
+                        <TextBlock Text="Пропущено" Opacity="0.7"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.SkippedStages, Mode=OneWay}"
+                                   FontSize="28" FontWeight="Bold" Foreground="Gray"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="3" Padding="16" CornerRadius="10"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <StackPanel>
+                        <TextBlock Text="Всего" Opacity="0.7"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.TotalStages, Mode=OneWay}"
+                                   FontSize="28" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Текущий агент и этап -->
+            <Border Grid.Row="4" Padding="16" CornerRadius="10"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    Visibility="{x:Bind ViewModel.Runner.HasActiveProject, Mode=OneWay}">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ProgressRing IsActive="{x:Bind ViewModel.Runner.IsRunning, Mode=OneWay}"
+                                           Width="20" Height="20"/>
+                        <TextBlock Text="Сейчас работает:" Opacity="0.7"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.CurrentAgent, Mode=OneWay}"
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="🎯 Этап:" Opacity="0.7"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.CurrentStage, Mode=OneWay}"
+                                   FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="💬 Последнее:" Opacity="0.7"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.LastMessage, Mode=OneWay}"
+                                   Opacity="0.85" TextWrapping="Wrap" MaxLines="2"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Последние события -->
+            <Border Grid.Row="5" BorderThickness="1" CornerRadius="8" Padding="8"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    Visibility="{x:Bind ViewModel.Runner.HasActiveProject, Mode=OneWay}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="360">
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Runner.Events, Mode=OneWay}">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Orientation="Vertical" Spacing="4"/>
+                        </ItemsRepeater.Layout>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8" Padding="4">
+                                <TextBlock Text="{Binding Icon}" FontSize="14"/>
+                                <TextBlock Text="{Binding Role}" FontWeight="SemiBold" MinWidth="110"/>
+                                <TextBlock Text="{Binding Payload}" Opacity="0.85"
+                                           FontFamily="Consolas" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsRepeater>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </ScrollViewer>
 </Page>

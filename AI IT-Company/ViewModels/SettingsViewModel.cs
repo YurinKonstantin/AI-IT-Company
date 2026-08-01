@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Text;
 using System.Threading.Tasks;
+using System.Transactions;
 
 namespace AI_IT_Company.ViewModels
 {
@@ -19,6 +20,42 @@ namespace AI_IT_Company.ViewModels
         private readonly OllamaClient _client;
         private readonly AgentPromptStore _promptStore;
         private readonly DispatcherQueue _ui;
+
+        public string[] CoderModeOptions { get; } =
+{
+    "🧑‍🤝‍🧑 Два кодера: Backend + Frontend (последовательно)",
+    "🧑‍💻 Один универсальный Fullstack-кодер"
+};
+
+
+        [ObservableProperty] private bool translationEnabled = true;
+        [ObservableProperty] private string userLanguage = "Russian";
+        [ObservableProperty] private string workingLanguage = "English";
+        [ObservableProperty] private string translationStatus = "";
+
+        public string[] SupportedLanguages { get; } =
+            { "English", "Russian", "Chinese", "Spanish", "German", "French",
+      "Portuguese", "Japanese", "Korean", "Italian", "Ukrainian", "Polish" };
+
+
+     
+
+[RelayCommand]
+        private async Task SaveTranslationAsync()
+        {
+            await _settings.SetTranslationEnabledAsync(TranslationEnabled);
+            await _settings.SetUserLanguageAsync(UserLanguage);
+            await _settings.SetWorkingLanguageAsync(WorkingLanguage);
+            TranslationStatus = TranslationEnabled
+                ? $"✅ {UserLanguage} ↔ {WorkingLanguage}"
+                : "⏸ Перевод отключён";
+        }
+
+
+
+        // В поля класса:
+        [ObservableProperty] private int coderModeIndex;  // 0 = Split, 1 = Unified
+        [ObservableProperty] private string coderModeStatus = "";
 
         // --- Ollama ---
         [ObservableProperty] private string ollamaUrl = "";
@@ -45,7 +82,10 @@ namespace AI_IT_Company.ViewModels
                   ?? throw new InvalidOperationException("UI-поток нужен.");
 
             OllamaUrl = _settings.Get(AppSettingsStore.KeyOllamaUrl, AppSettingsStore.KeyOllamaDefaultUrl);
-
+            CoderModeIndex = _settings.GetCoderMode() == Core.Contracts.CoderMode.Unified ? 1 : 0;
+            TranslationEnabled = _settings.GetTranslationEnabled();
+            UserLanguage = _settings.GetUserLanguage();
+            WorkingLanguage = _settings.GetWorkingLanguage();
             LoadTemplates();
             LoadPrompts();
             _ = RefreshTemplatesAsync();
@@ -183,6 +223,7 @@ namespace AI_IT_Company.ViewModels
             AgentRole.Architect => "🏛 Архитектор",
             AgentRole.BackendCoder => "⚙ Backend",
             AgentRole.FrontendCoder => "🎨 Frontend",
+            AgentRole.FullstackCoder => "🧑‍💻 Fullstack-Кодер",
             AgentRole.GameCoder => "🎮 Game",
             AgentRole.Tester => "🧪 Тестировщик",
             AgentRole.Builder => "🔧 Сборщик",
@@ -191,6 +232,17 @@ namespace AI_IT_Company.ViewModels
             AgentRole.Scaffolder => "🏗 Скаффолдер",
             _ => r.ToString()
         };
+
+        [RelayCommand]
+        private async Task SaveCoderModeAsync()
+        {
+            var mode = CoderModeIndex == 1
+                ? Core.Contracts.CoderMode.Unified
+                : Core.Contracts.CoderMode.Split;
+
+            await _settings.SetCoderModeAsync(mode);
+            CoderModeStatus = $"💾 Сохранено: {CoderModeOptions[CoderModeIndex]}";
+        }
     }
 
     public partial class TemplateStatusItem : ObservableObject

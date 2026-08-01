@@ -45,72 +45,73 @@
                  Text="{x:Bind ViewModel.Prompt, Mode=TwoWay}"/>
 
         <!-- Панель управления запуском + текущий проект -->
-        <Grid Grid.Row="4" ColumnSpacing="12">
+        <!-- Панель управления запуском + текущий проект -->
+        <Grid Grid.Row="4" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <Button Grid.Column="0"
-                    Content="🚀 Запустить конвейер"
-                    Style="{ThemeResource AccentButtonStyle}"
-                    Command="{x:Bind ViewModel.RunCommand}"/>
+            Content="🚀 Запустить конвейер"
+            Style="{ThemeResource AccentButtonStyle}"
+            Command="{x:Bind ViewModel.RunCommand}"
+            IsEnabled="{x:Bind ViewModel.Runner.IsRunning, Mode=OneWay,
+                        Converter={StaticResource BoolNegationConverter}}"/>
 
-            <muxc:ProgressRing Grid.Column="1"
-                               IsActive="{x:Bind ViewModel.IsRunning, Mode=OneWay}"
-                               Width="24" Height="24"
-                               VerticalAlignment="Center"/>
+            <Button Grid.Column="1"
+            Content="⏹ Остановить"
+            Command="{x:Bind ViewModel.StopCommand}"
+            IsEnabled="{x:Bind ViewModel.Runner.IsRunning, Mode=OneWay}"/>
 
-            <!-- Информационная панель с ProjectId и путём -->
-            <muxc:InfoBar Grid.Column="2"
-                          IsOpen="{x:Bind ViewModel.HasActiveProject, Mode=OneWay}"
-                          IsClosable="False"
-                          Severity="Success"
-                          Title="Проект">
+            <muxc:ProgressRing Grid.Column="2"
+                       IsActive="{x:Bind ViewModel.Runner.IsRunning, Mode=OneWay}"
+                       Width="24" Height="24" VerticalAlignment="Center"/>
+
+            <muxc:InfoBar Grid.Column="3"
+                  IsOpen="{x:Bind ViewModel.Runner.HasActiveProject, Mode=OneWay}"
+                  IsClosable="False" Severity="Success" Title="Проект">
                 <muxc:InfoBar.Content>
-                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,4">
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4">
                         <TextBlock Text="ID:" Opacity="0.7"/>
-                        <TextBlock Text="{x:Bind ViewModel.CurrentProjectId, Mode=OneWay}"
-                                   FontFamily="Consolas" FontWeight="SemiBold"/>
-                        <Button Content="📋"
-                                ToolTipService.ToolTip="Скопировать ID"
-                                Command="{x:Bind ViewModel.CopyProjectIdCommand}"
-                                Padding="6,2"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.CurrentProjectId, Mode=OneWay}"
+                           FontFamily="Consolas" FontWeight="SemiBold"/>
+                        <Button Content="📋" ToolTipService.ToolTip="Скопировать ID"
+                        Command="{x:Bind ViewModel.CopyProjectIdCommand}" Padding="6,2"/>
                         <TextBlock Text="→" Opacity="0.5"/>
-                        <TextBlock Text="{x:Bind ViewModel.CurrentOutputRoot, Mode=OneWay}"
-                                   FontFamily="Consolas"
-                                   Opacity="0.85"
-                                   TextTrimming="CharacterEllipsis"
-                                   MaxWidth="360"
-                                   ToolTipService.ToolTip="{x:Bind ViewModel.CurrentOutputRoot, Mode=OneWay}"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.CurrentOutputRoot, Mode=OneWay}"
+                           FontFamily="Consolas" Opacity="0.85"
+                           TextTrimming="CharacterEllipsis" MaxWidth="360"/>
                     </StackPanel>
                 </muxc:InfoBar.Content>
                 <muxc:InfoBar.ActionButton>
-                    <Button Content="📂 Открыть папку"
-                            Command="{x:Bind ViewModel.OpenFolderCommand}"/>
+                    <Button Content="📂 Открыть папку" Command="{x:Bind ViewModel.OpenFolderCommand}"/>
                 </muxc:InfoBar.ActionButton>
             </muxc:InfoBar>
         </Grid>
 
-        <!-- Лента событий -->
-        <Border Grid.Row="5"
-                BorderThickness="1"
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                CornerRadius="8"
-                Padding="8">
+        <!-- Лента событий (теперь показывает Icon + Role + Payload) -->
+        <Border Grid.Row="5" BorderThickness="1"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        CornerRadius="8" Padding="8">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ItemsRepeater ItemsSource="{x:Bind ViewModel.Events}">
+                <ItemsRepeater ItemsSource="{x:Bind ViewModel.Runner.Events, Mode=OneWay}">
                     <ItemsRepeater.Layout>
                         <StackLayout Orientation="Vertical" Spacing="6"/>
                     </ItemsRepeater.Layout>
                     <DataTemplate>
                         <Border Padding="10" CornerRadius="6"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                             <StackPanel>
-                                <TextBlock Text="{Binding Role}" FontWeight="SemiBold"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="{Binding Icon}" FontSize="16"/>
+                                    <TextBlock Text="{Binding Role}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding At}" Opacity="0.5" FontSize="11" VerticalAlignment="Center"/>
+                                </StackPanel>
                                 <TextBlock Text="{Binding Payload}" TextWrapping="Wrap"
-                                           Opacity="0.85" FontFamily="Consolas"/>
+                                   Opacity="0.85" FontFamily="Consolas"/>
                             </StackPanel>
                         </Border>
                     </DataTemplate>

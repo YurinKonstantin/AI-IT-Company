@@ -150,7 +150,10 @@ public sealed class AgentConfigStore
     private static AgentSettings Default(AgentRole role) => role switch
     {
         // Интерпретатор — маленький, быстрый, детерминированный (JSON).
-        AgentRole.Interpreter => new() { Source = "Ollama", ModelName = "gemma4:12b", Temperature = 0.1 },
+        AgentRole.Interpreter => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.1 },
+
+        // Переводчик — маленький, быстрый, детерминированный (JSON).
+        AgentRole.Translator => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.1 },
 
         // Архитектор — креативнее.
         AgentRole.Architect => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.5 },
@@ -159,12 +162,13 @@ public sealed class AgentConfigStore
         AgentRole.BackendCoder => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.2 },
         AgentRole.FrontendCoder => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.2 },
         AgentRole.GameCoder => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.3 },
+        AgentRole.FullstackCoder => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.3 },
 
         // Тестировщик — строгий.
         AgentRole.Tester => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.15 },
 
         // Builder — LLM почти не нужна, ставим лёгкую.
-        AgentRole.Builder => new() { Source = "Ollama", ModelName = "gemma4:12b", Temperature = 0.0 },
+        AgentRole.Builder => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.0 },
 
         // Исправитель — вдумчивый.
         AgentRole.ErrorFixer => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.1 },

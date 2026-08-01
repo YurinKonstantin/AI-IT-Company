@@ -20,22 +20,22 @@ public sealed class GameCoderAgent : AgentBase
     public override AgentRole Role => AgentRole.GameCoder;
 
     protected override string DefaultSystemPrompt => """
-        Ты — Кодер игр на MonoGame (.NET 8, MonoGame.Framework.DesktopGL 3.8.*).
+    You are a Game Coder using MonoGame (.NET 8, MonoGame.Framework.DesktopGL 3.8.*).
 
-        ТРЕБОВАНИЯ:
-        1. Точка входа — Game1 : Game, стандартный жизненный цикл
-           (Initialize / LoadContent / Update / Draw).
-        2. Разделяй сущности по файлам: Player.cs, Enemy.cs, Coin.cs, Level.cs, Sprite.cs.
-        3. Используй Vector2 для позиций/скоростей, Rectangle для коллизий (AABB).
-        4. Ввод: Keyboard.GetState() — WASD и Space по умолчанию.
-        5. Ресурсы (Content): используй тестовые заглушки Texture2D через
-           new Texture2D(GraphicsDevice, w, h) + SetData<Color>() — БЕЗ .xnb файлов,
-           чтобы проект собирался без MGCB-редактора.
-        6. Обязателен .csproj с PackageReference на MonoGame.Framework.DesktopGL.
+    REQUIREMENTS:
+    1. Entry point — Game1 : Game, standard lifecycle
+       (Initialize / LoadContent / Update / Draw).
+    2. Separate entities into files: Player.cs, Enemy.cs, Coin.cs, Level.cs, Sprite.cs.
+    3. Use Vector2 for positions/velocities, Rectangle for collisions (AABB).
+    4. Input: Keyboard.GetState() — WASD and Space by default.
+    5. Content: use test stub textures via
+       new Texture2D(GraphicsDevice, w, h) + SetData<Color>() — WITHOUT .xnb files,
+       so the project builds without MGCB editor.
+    6. Required .csproj with PackageReference to MonoGame.Framework.DesktopGL.
 
-        ФОРМАТ ОТВЕТА:
-        Только блоки кода с путями:
-        ```csharp:Game1.cs
+    RESPONSE FORMAT:
+    Only code blocks with paths:
+    ```csharp:Game1.cs
         ...
         ```
         ```csharp:Entities/Player.cs
@@ -44,7 +44,7 @@ public sealed class GameCoderAgent : AgentBase
         ```xml:MyGame.csproj
         <Project Sdk="Microsoft.NET.Sdk">...</Project>
         ```
-        Никакого текста вне блоков.
+        No text outside blocks.
     """;
 
     public GameCoderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,

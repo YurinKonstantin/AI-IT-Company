@@ -4,6 +4,7 @@ using Core.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -18,13 +19,15 @@ namespace Core.Orchestration
     {
         private readonly Dictionary<AgentRole, IAgent> _agents;
         private readonly ILogger<StagedPipeline> _logger;
+        private readonly Configuration.AppSettingsStore _settings;
 
         public Channel<PipelineEvent> Events { get; } =
             Channel.CreateUnbounded<PipelineEvent>(new UnboundedChannelOptions { SingleReader = false });
 
-        public StagedPipeline(IEnumerable<IAgent> agents, ILogger<StagedPipeline> logger)
+        public StagedPipeline(IEnumerable<IAgent> agents, Configuration.AppSettingsStore settings, ILogger<StagedPipeline> logger)
         {
             _agents = agents.ToDictionary(a => a.Role);
+            _settings = settings;
             _logger = logger;
         }
 
@@ -34,6 +37,7 @@ namespace Core.Orchestration
             await RunAgent(AgentRole.Interpreter, ctx, ct);
 
             // 2) Архитектор формирует ТЗ + план + сохраняет TZ.md
+            
             await RunAgent(AgentRole.Architect, ctx, ct);
             if (ctx.Plan is null)
             {
@@ -100,7 +104,7 @@ namespace Core.Orchestration
                 await Emit(AgentRole.Architect, "stage-start", $"{next.Id}. {next.Name}");
 
                 // Очищаем накопления предыдущего этапа
-                foreach (var k in new[] { "backend_code", "frontend_code", "game_code", "tests_code", "fix_code" })
+                foreach (var k in new[] { "backend_code", "frontend_code", "game_code", "tests_code", "fix_code", "fullstack_code" })
                     ctx.SharedData.Remove(k);
 
                 // Кодеры выполняются ПОСЛЕДОВАТЕЛЬНО, чтобы:
@@ -110,11 +114,23 @@ namespace Core.Orchestration
                 // Game обычно живёт отдельно от Backend/Frontend, но если сценарий смешанный —
                 // запускается последним и получает весь предыдущий контекст.
 
-                if (next.Scope.Contains("Backend"))
-                    await RunAgent(AgentRole.BackendCoder, ctx, ct);
+                // Определяем текущий режим кодера — читаем каждый раз, чтобы можно было менять на лету.
+                var coderMode = _settings.GetCoderMode();
 
-                if (next.Scope.Contains("Frontend"))
-                    await RunAgent(AgentRole.FrontendCoder, ctx, ct);
+                bool wantsBackend = next.Scope.Contains("Backend");
+                bool wantsFrontend = next.Scope.Contains("Frontend");
+
+                if (coderMode == CoderMode.Unified && (wantsBackend || wantsFrontend))
+                {
+                    // Один агент делает всё за один заход.
+                    await RunAgent(AgentRole.FullstackCoder, ctx, ct);
+                }
+                else
+                {
+                    // Классика: Backend, потом Frontend. Frontend видит код Backend.
+                    if (wantsBackend) await RunAgent(AgentRole.BackendCoder, ctx, ct);
+                    if (wantsFrontend) await RunAgent(AgentRole.FrontendCoder, ctx, ct);
+                }
 
                 if (next.Scope.Contains("Game"))
                     await RunAgent(AgentRole.GameCoder, ctx, ct);

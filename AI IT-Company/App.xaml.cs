@@ -5,6 +5,7 @@ using Core.Agents;
 using Core.Configuration;
 using Core.Contracts;
 using Core.Orchestration;
+using Core.Services;
 using Data;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,7 +25,6 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using ViewModels;
-using ViewModels;
 using Windows.ApplicationModel;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -41,7 +41,7 @@ namespace AI_IT_Company
     {
         public static IHost Host { get; private set; } = null!;
         public Window? MainWindow;
-
+        public static Window MainWindowRef => ((App)Current).MainWindow!;
         public App()
         {
             InitializeComponent();
@@ -71,23 +71,44 @@ namespace AI_IT_Company
                 s.AddTransient<IAgent, ArchitectAgent>();
                 s.AddTransient<IAgent, BackendCoderAgent>();
                 s.AddTransient<IAgent, FrontendCoderAgent>();
+                s.AddTransient<IAgent, FullstackCoderAgent>();
                 s.AddTransient<IAgent, GameCoderAgent>();
                 s.AddTransient<IAgent, TesterAgent>();
                 s.AddTransient<IAgent, BuilderAgent>();
                 s.AddTransient<IAgent, ErrorFixerAgent>();
                 s.AddTransient<IAgent, SecretaryAgent>();
+                s.AddTransient<IAgent, ScaffolderAgent>();
+               // s.AddTransient<IAgent, TranslatorAgent>();
 
                 // s.AddTransient<AgentPipeline>();
                 s.AddTransient<StagedPipeline>();
                 s.AddTransient<AgentsConfigViewModel>();
-                s.AddTransient<ChatViewModel>();
                 s.AddSingleton<OllamaClient>(_ => new OllamaClient("http://localhost:11434"));
                 s.AddTransient<ModelsViewModel>();
-                s.AddTransient<IAgent, ScaffolderAgent>();
+                
                 s.AddSingleton<AppSettingsStore>();
                 s.AddSingleton<AgentPromptStore>();
                 s.AddTransient<SettingsViewModel>();
 
+
+                // Новый сервис — синглтон для всех страниц
+                s.AddSingleton<AI_IT_Company.Services.PipelineRunService>();
+
+                // ChatViewModel теперь Singleton — состояние переживает навигацию
+                s.AddSingleton<ChatViewModel>();
+               
+
+                // Новые ViewModel-и
+                s.AddSingleton<AI_IT_Company.ViewModels.DashboardViewModel>();
+                s.AddSingleton<AI_IT_Company.ViewModels.LogsViewModel>();
+
+              
+
+
+
+                s.AddSingleton<TranslatorAgent>();                // явный singleton для сервиса
+                s.AddTransient<IAgent>(sp => sp.GetRequiredService<TranslatorAgent>()); 
+                s.AddSingleton<ITranslationService, TranslationService>();
             }).Build();
         }
 
@@ -106,6 +127,10 @@ namespace AI_IT_Company
 
             MainWindow = new MainWindow();
             MainWindow.Activate();
+           
+            Host.Services
+                .GetRequiredService<AI_IT_Company.Services.PipelineRunService>()
+                .AttachUi(MainWindow.DispatcherQueue);
         }
     }
  }

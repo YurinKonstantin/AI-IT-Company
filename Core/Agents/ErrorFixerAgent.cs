@@ -23,29 +23,29 @@ public sealed class ErrorFixerAgent : AgentBase
     public override AgentRole Role => AgentRole.ErrorFixer;
 
     protected override string DefaultSystemPrompt => """
-        Ты — Исправитель ошибок. Специалист по C# / .NET / WinUI 3 / Monogame.
+    You are an Error Fixer. Specialist in C# / .NET / WinUI 3 / Monogame.
 
-        АЛГОРИТМ:
-        1. Прочитай лог сборки или описание ошибки от пользователя.
-        2. Определи КОРЕНЬ проблемы (не симптом): неинициализированное поле,
-           неправильный namespace, отсутствующий NuGet, несовместимая версия API и т.д.
-        3. Выведи КРАТКИЙ разбор в блоке:
-           ```analysis
-           Причина: ...
-           Файлы к правке: ...
+    ALGORITHM:
+    1. Read the build log or error description from the user.
+    2. Identify the ROOT cause of the problem (not the symptom): uninitialized field,
+       incorrect namespace, missing NuGet package, incompatible API version, etc.
+    3. Output a BRIEF analysis in a block:
+       ```analysis
+       Cause: ...
+       Files to modify: ...
            ```
-        4. Затем — ПОЛНЫЕ исправленные версии файлов (не фрагменты!):
+        4. Then — COMPLETE corrected versions of the files (not fragments!):
            ```csharp:Path/To/File.cs
-           // полный файл целиком
+           // full file entirely
            ```
-        5. Если нужно добавить NuGet — выведи обновлённый .csproj полностью.
-        6. Не придумывай API, которых нет. Если сомневаешься — используй проверенный подход.
-        7. Сохраняй существующую логику; меняй минимум, необходимый для исправления.
+        5. If a NuGet package needs to be added — output the updated .csproj completely.
+        6. Do not invent APIs that do not exist. If in doubt, use a proven approach.
+        7. Preserve existing logic; change the minimum required to fix the issue.
 
-        ЗАПРЕЩЕНО:
-        - Возвращать diff-хунки (@@ ... @@).
-        - Возвращать только фрагменты класса.
-        - Писать текст вне блоков (кроме блока ```analysis).
+       PROHIBITED:
+        - Returning diff-hunks (@@ ... @@).
+        - Returning only class fragments.
+        - Writing text outside blocks (except the ```analysis block).
     """;
 
     public ErrorFixerAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
@@ -59,27 +59,27 @@ public sealed class ErrorFixerAgent : AgentBase
         ctx.SharedData["fixer_attempt"] = (int.Parse(attempt) + 1).ToString();
 
         var stageBlock = stage is null ? "" : $"""
-        === ТЕКУЩИЙ ЭТАП ===
-        {stage.Id}. {stage.Name}
-        Deliverables: {string.Join("; ", stage.Deliverables)}
-        """;
+ === CURRENT STAGE ===
+ {stage.Id}. {stage.Name}
+ Deliverables: {string.Join("; ", stage.Deliverables)}
+ """;
 
         return $"""
-        Попытка №{int.Parse(attempt) + 1}. Задача — вернуть код в собираемое состояние в рамках ТЕКУЩЕГО ЭТАПА.
-        Не выходи за scope этапа. Если ошибка вне scope — верни только затронутые файлы неизменёнными и укажи это в analysis.
+ Attempt #{int.Parse(attempt) + 1}. Task: return code to a compilable state within the CURRENT STAGE.
+ Do not go beyond the stage scope. If an error is outside the scope, return only the affected files unchanged and indicate this in analysis.
 
-        {stageBlock}
+ {stageBlock}
 
-        === Полный лог сборки (последние 6000 симв.) ===
-        {TruncateTail(buildLog, 6000)}
+ === Full build log (last 6000 chars) ===
+ {TruncateTail(buildLog, 6000)}
 
-        === Код, доступный в этом этапе ===
-        {BuildCodeContext(ctx)}
+ === Code available in this stage ===
+ {BuildCodeContext(ctx)}
 
-        Верни:
-        1) блок ```analysis``` — краткий диагноз;
-        2) ПОЛНЫЕ версии файлов, которые надо переписать.
-        """;
+ Return:
+ 1) ```analysis``` block — brief diagnosis;
+ 2) COMPLETE versions of files that need to be rewritten.
+ """;
     }
 
     protected override Task<AgentResult> PostProcessAsync(AgentContext ctx, string output, CancellationToken ct)
@@ -127,7 +127,7 @@ public sealed class ErrorFixerAgent : AgentBase
     {
         var chunks = new List<string>();
 
-        foreach (var key in new[] { "backend_code", "frontend_code", "game_code", "tests_code", "fix_code" })
+        foreach (var key in new[] { "backend_code", "frontend_code", "game_code", "tests_code", "fix_code", "fullstack_code" })
         {
             if (ctx.SharedData.TryGetValue(key, out var blob) && !string.IsNullOrWhiteSpace(blob))
                 chunks.Add($"# {key}\n{blob}");

@@ -18,7 +18,7 @@ namespace Core.Agents
     public sealed class ScaffolderAgent : AgentBase
     {
         public override AgentRole Role => AgentRole.Scaffolder;
-        protected override string DefaultSystemPrompt => "(scaffolder, LLM не используется)";
+        protected override string DefaultSystemPrompt => "(scaffolder, LLM is not used)";
 
         public ScaffolderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
                                ILogger<ScaffolderAgent> logger)

@@ -1,3 +1,5 @@
+using AI_IT_Company.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -23,8 +25,11 @@ namespace AI_IT_Company.Views
     /// </summary>
     public sealed partial class DashboardPage : Page
     {
+        public DashboardViewModel ViewModel { get; }
+
         public DashboardPage()
         {
+            ViewModel = App.Host.Services.GetRequiredService<DashboardViewModel>();
             InitializeComponent();
         }
     }

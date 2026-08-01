@@ -3,6 +3,7 @@ using Core.Agents;
 using Core.Configuration;
 using Core.Contracts;
 using Core.Models;
+using Core.Services;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -18,72 +19,72 @@ namespace Core.Agents;
 public sealed class ArchitectAgent : AgentBase
 {
     public override AgentRole Role => AgentRole.Architect;
-
+    ITranslationService _translator;
     protected override string DefaultSystemPrompt => """
-        Ты — Архитектор. Твоя задача — составить ТЕХНИЧЕСКОЕ ЗАДАНИЕ и ПЛАН ЭТАПОВ.
-        КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО:
-        - Писать код (никаких C#, XAML, JSON-кода приложения, csproj и т.п.).
-        - Указывать конкретные имена файлов, классов, методов, переменных.
-        - Указывать конкретные библиотеки или NuGet-пакеты (это решает Кодер).
+    You are the Architect. Your task is to create a TECHNICAL SPECIFICATION and STAGE PLAN.
+    IT IS STRICTLY PROHIBITED TO:
+    - Write code (no C#, XAML, JSON application code, csproj, etc.).
+    - Specify concrete file names, classes, methods, or variables.
+    - Specify concrete libraries or NuGet packages (that is the Coder's decision).
 
-        ЧТО НУЖНО СДЕЛАТЬ:
-        1. Понять задачу пользователя.
-        2. Сформулировать функциональные возможности с описанием и преимуществами для пользователя.
-        3. Составить нефункциональные требования (производительность, надёжность, UX и т.д.).
-        4. Разбить работу на ЭТАПЫ так, чтобы:
-           - каждый этап оставлял РАБОЧУЮ программу (пусть с урезанным функционалом),
-           - явно указывалось, от каких других этапов он зависит,
-           - были критерии приёмки, по которым можно проверить успех.
+    WHAT YOU MUST DO:
+    1. Understand the user's task.
+    2. Formulate functional capabilities with descriptions and user benefits.
+    3. Compose non-functional requirements (performance, reliability, UX, etc.).
+    4. Break down the work into STAGES such that:
+       - each stage results in a WORKING program (even with limited functionality),
+       - explicitly indicate which other stages it depends on,
+       - include acceptance criteria to verify success.
 
-               СТРОГО:  все ключи И значения-строки — В ДВОЙНЫХ КАВЫЧКАХ. Никаких //-комментариев,
-    никаких висящих запятых, никаких одинарных кавычек. Ответ — ровно один JSON-объект,
-    без markdown-обёртки.
+    STRICTLY: all keys and string values MUST be in DOUBLE QUOTES. No //-comments,
+    no trailing commas, no single quotes. Response must be exactly one JSON object,
+    without markdown wrapper.
 
-        ФОРМАТ ОТВЕТА — СТРОГО JSON (без markdown-обёрток, без пояснений):
+    RESPONSE FORMAT — STRICTLY JSON (no markdown wrappers, no explanations):
+    {
+      "title": "...",
+      "summary": "2–4 sentences about the project",
+      "features": [
+        {"name":"...","description":"...","advantage":"user benefit"}
+      ],
+      "nonFunctionalRequirements": ["..."],
+      "constraints": ["..."],
+      "stages": [
         {
-          "title": "...",
-          "summary": "2–4 предложения о проекте",
-          "features": [
-            {"name":"...","description":"...","advantage":"выгода для пользователя"}
-          ],
-          "nonFunctionalRequirements": ["..."],
-          "constraints": ["..."],
-          "stages": [
-            {
-              "id": "S1",
-              "name": "Минимально жизнеспособная версия",
-              "goal": "Что должно работать после этапа",
-              "deliverables": ["функциональные пункты, БЕЗ упоминания файлов/классов"],
-              "acceptanceCriteria": ["..."],
-              "dependsOn": [],
-              "scope": ["Backend","Frontend"]
-            }
-          ]
+          "id": "S1",
+          "name": "Minimum Viable Version",
+          "goal": "What should work after this stage",
+          "deliverables": ["functional items, WITHOUT mentioning files/classes"],
+          "acceptanceCriteria": ["..."],
+          "dependsOn": [],
+          "scope": ["Backend","Frontend"]
         }
+      ]
+    }
 
-        ПРАВИЛА ДЛЯ ЭТАПОВ:
-        - S1 всегда независим (dependsOn: []) и даёт минимальный работающий результат.
-        - Каждый следующий этап опирается на предыдущие только там, где это действительно нужно.
-        - Старайся делать этапы независимыми, где возможно — это важно для отказоустойчивости.
-        - scope принимает значения: "Backend", "Frontend", "Game", "Tests", "Docs".
-    """;
+    STAGE RULES:
+    - S1 is always independent (dependsOn: []) and provides a minimal working result.
+    - Each subsequent stage should only depend on previous ones where truly necessary.
+    - Try to make stages as independent as possible — this is important for fault tolerance.
+    - scope accepts values: "Backend", "Frontend", "Game", "Tests", "Docs".
+""";
 
-    public ArchitectAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
+    public ArchitectAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore, ITranslationService translator,
                           ILogger<ArchitectAgent> logger)
-        : base(factory, configStore, promptStore, logger) { }
+        : base(factory, configStore, promptStore, translator, logger) { _translator = translator; }
 
     protected override string BuildUserPrompt(AgentContext ctx)
     {
-        var files = ctx.Files.Count > 0 ? string.Join("\n", ctx.Files.Take(50)) : "(новый проект)";
+        var files = ctx.Files.Count > 0 ? string.Join("\n", ctx.Files.Take(50)) : "(new project)";
         return $"""
-            Задача от пользователя: {ctx.UserPrompt}
-            Тип проекта: {ctx.Type}
-            Режим: {ctx.Mode}
+            User task: {ctx.UserPrompt}
+            Project type: {ctx.Type}
+            Mode: {ctx.Mode}
 
-            Существующие файлы:
+            Existing files:
             {files}
 
-            Составь ТЗ и план этапов в требуемом JSON-формате.
+            Create a technical specification and a phased plan in the required JSON format.
             """;
     }
 
@@ -135,7 +136,20 @@ public sealed class ArchitectAgent : AgentBase
             Logger.LogInformation("[Architect] План: {StageCount} этапов, {FeatureCount} функций.",
                 plan.Stages.Count, plan.Features.Count);
 
-            return new AgentResult(true, tzMarkdown);
+
+
+
+            // Переводим ТЗ обратно на язык пользователя для отображения.
+            var tzTranslated = await _translator.ToUserAsync(tzMarkdown, ct);
+            ctx.SharedData["tz_markdown_original"] = tzMarkdown;   // оставим оригинал для кодеров
+            ctx.SharedData["tz_markdown_localized"] = tzTranslated;
+
+            // Файл сохраняем в двух версиях:
+            await SaveTzAsync(ctx, tzMarkdown, ct);                                 // TZ.md — рабочий
+            await SaveTzLocalizedAsync(ctx, tzTranslated, ct);                      // TZ.localized.md
+
+
+            return new AgentResult(true, tzTranslated);                             // пользователю — локализованный
         }
         catch (Exception ex)
         {
@@ -143,7 +157,13 @@ public sealed class ArchitectAgent : AgentBase
             return new AgentResult(false, output, ex.Message);
         }
     }
-
+    private static async Task SaveTzLocalizedAsync(AgentContext ctx, string text, CancellationToken ct)
+    {
+        var root = ctx.OutputRoot ?? ctx.ProjectPath ?? PathHelper.GetProjectOutputRoot(ctx.ProjectId);
+        PathHelper.EnsureDirectory(root);
+        var path = Path.Combine(root, "TZ.localized.md");
+        await File.WriteAllTextAsync(path, text, ct);
+    }
     private static void ValidatePlan(ProjectPlan plan)
     {
         if (plan.Stages.Count == 0)
@@ -234,37 +254,37 @@ public sealed class ArchitectAgent : AgentBase
     private static string RenderTzMarkdown(ProjectPlan p)
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"# ТЗ: {p.Title}\n");
-        sb.AppendLine("## Краткое описание\n").AppendLine(p.Summary).AppendLine();
+        sb.AppendLine($"# Technical Specifications: {p.Title}\n");
+        sb.AppendLine("## Brief description\n").AppendLine(p.Summary).AppendLine();
 
-        sb.AppendLine("## Функциональные возможности\n");
+        sb.AppendLine("## Functional capabilities\n");
         foreach (var f in p.Features)
-            sb.AppendLine($"### {f.Name}\n- **Описание:** {f.Description}\n- **Преимущество:** {f.Advantage}\n");
+            sb.AppendLine($"### {f.Name}\n- **Description:** {f.Description}\n- **Advantage:** {f.Advantage}\n");
 
         if (p.NonFunctionalRequirements.Count > 0)
         {
-            sb.AppendLine("## Нефункциональные требования");
+            sb.AppendLine("## Non-functional requirements");
             foreach (var r in p.NonFunctionalRequirements) sb.AppendLine($"- {r}");
             sb.AppendLine();
         }
 
         if (p.Constraints.Count > 0)
         {
-            sb.AppendLine("## Ограничения");
+            sb.AppendLine("## Restrictions");
             foreach (var c in p.Constraints) sb.AppendLine($"- {c}");
             sb.AppendLine();
         }
 
-        sb.AppendLine("## План этапов\n");
+        sb.AppendLine("## Phased plan\n");
         foreach (var s in p.Stages)
         {
             sb.AppendLine($"### {s.Id}. {s.Name}");
-            sb.AppendLine($"- **Цель:** {s.Goal}");
-            sb.AppendLine($"- **Зависит от:** {(s.DependsOn.Count == 0 ? "—" : string.Join(", ", s.DependsOn))}");
-            sb.AppendLine($"- **Область:** {string.Join(", ", s.Scope)}");
+            sb.AppendLine($"- **Target:** {s.Goal}");
+            sb.AppendLine($"- **It depends on:** {(s.DependsOn.Count == 0 ? "—" : string.Join(", ", s.DependsOn))}");
+            sb.AppendLine($"- **Region:** {string.Join(", ", s.Scope)}");
             sb.AppendLine("- **Результаты:**");
             foreach (var d in s.Deliverables) sb.AppendLine($"  - {d}");
-            sb.AppendLine("- **Критерии приёмки:**");
+            sb.AppendLine("- **Acceptance criteria:**");
             foreach (var a in s.AcceptanceCriteria) sb.AppendLine($"  - {a}");
             sb.AppendLine();
         }

@@ -17,6 +17,14 @@ namespace Core.Configuration
 
         public const string KeyOllamaUrl = "OllamaUrl";
         public const string KeyOllamaDefaultUrl = "http://localhost:11434";
+        public const string KeyCoderMode = "CoderMode";
+        public const string KeyCoderModeDefault = "Unified";
+
+
+        public const string KeyTranslationEnabled = "TranslationEnabled";
+        public const string KeyUserLanguage = "UserLanguage";      // "ru", "zh", "es", ...
+        public const string KeyWorkingLanguage = "WorkingLanguage";   // язык, на котором работают агенты
+        public const string KeyWorkingLanguageDefault = "English";
 
         public event EventHandler<string>? SettingChanged;
 
@@ -55,5 +63,29 @@ namespace Core.Configuration
             finally { _lock.Release(); }
             SettingChanged?.Invoke(this, key);
         }
+
+        public Core.Contracts.CoderMode GetCoderMode()
+        {
+            var raw = Get(KeyCoderMode, KeyCoderModeDefault);
+            return System.Enum.TryParse<Core.Contracts.CoderMode>(raw, ignoreCase: true, out var m)
+                ? m : Core.Contracts.CoderMode.Split;
+        }
+
+        public Task SetCoderModeAsync(Core.Contracts.CoderMode mode) => SetAsync(KeyCoderMode, mode.ToString());
+
+
+
+
+        public bool GetTranslationEnabled() =>
+    bool.TryParse(Get(KeyTranslationEnabled, "true"), out var b) && b;
+
+        public Task SetTranslationEnabledAsync(bool v) =>
+            SetAsync(KeyTranslationEnabled, v.ToString());
+
+        public string GetUserLanguage() => Get(KeyUserLanguage, "Russian");
+        public string GetWorkingLanguage() => Get(KeyWorkingLanguage, KeyWorkingLanguageDefault);
+
+        public Task SetUserLanguageAsync(string v) => SetAsync(KeyUserLanguage, v); public Task SetWorkingLanguageAsync(string v) => SetAsync(KeyWorkingLanguage, v);
+
     }
 }

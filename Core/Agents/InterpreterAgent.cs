@@ -13,18 +13,18 @@ public sealed class InterpreterAgent : AgentBase
 {
     public override AgentRole Role => AgentRole.Interpreter;
     protected override string DefaultSystemPrompt => """
-        Ты — Интерпретатор. Верни СТРОГО JSON:
-        {"mode":"CreateNew|Improve|FixError|Document|Analyze",
-         "type":"WinUI|Api|Console|MonogameGame",
-         "summary":"..."}
-        Никакого другого текста.
-    """;
+    You are an Interpreter. Return STRICTLY JSON:
+    {"mode":"CreateNew|Improve|FixError|Document|Analyze",
+     "type":"WinUI|Api|Console|MonogameGame",
+     "summary":"..."}
+    No other text.
+""";
 
     public InterpreterAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
                         ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore, logger) { }
 
     protected override string BuildUserPrompt(AgentContext ctx)
-        => $"Промпт пользователя: {ctx.UserPrompt}\nПуть к проекту: {ctx.ProjectPath ?? "нет"}";
+        => $"User prompt: {ctx.UserPrompt}\nProject path: {ctx.ProjectPath ?? "нет"}";
 
     protected override Task<AgentResult> PostProcessAsync(AgentContext ctx, string output, CancellationToken ct)
     {

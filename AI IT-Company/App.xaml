@@ -3,7 +3,7 @@
     x:Class="AI_IT_Company.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:AI_IT_Company">
+    xmlns:local="using:AI_IT_Company" xmlns:converters="using:AI_IT_Company.Converters">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -11,6 +11,7 @@
                 <!-- Other merged dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
             <!-- Other app resources here -->
+            <converters:BoolNegationConverter x:Key="BoolNegationConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

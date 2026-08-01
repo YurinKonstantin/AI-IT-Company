@@ -5,11 +5,70 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:AI_IT_Company.Views"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:viewmodels="using:AI_IT_Company.ViewModels"
     mc:Ignorable="d">
 
-    <StackPanel Padding="24" Spacing="8">
-        <TextBlock Text="📜 Логи" Style="{ThemeResource TitleTextBlockStyle}"/>
-        <TextBlock Opacity="0.7" Text="Здесь будет журнал работы агентов."/>
-    </StackPanel>
+    <Grid Padding="16" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <TextBlock Text="📜 Логи" Style="{ThemeResource TitleTextBlockStyle}"/>
+            <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                       VerticalAlignment="Center" Opacity="0.7"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+            <Button Content="🔄 Обновить"   Command="{x:Bind ViewModel.RefreshCommand}"/>
+            <Button Content="📂 Папка логов" Command="{x:Bind ViewModel.OpenFolderCommand}"/>
+            <Button Content="📋 Скопировать" Command="{x:Bind ViewModel.CopyContentCommand}"/>
+            <Button Content="🧹 Очистить панель" Command="{x:Bind ViewModel.ClearContentCommand}"/>
+            <ToggleSwitch Header="Авто-обновление"
+                          IsOn="{x:Bind ViewModel.AutoRefresh, Mode=TwoWay}"
+                          OnContent="вкл" OffContent="выкл"/>
+        </StackPanel>
+
+        <!-- Двухпанельный список слева, содержимое справа -->
+        <Grid Grid.Row="2" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Список файлов -->
+            <Border BorderThickness="1" CornerRadius="8" Padding="4"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <ListView ItemsSource="{x:Bind ViewModel.Files, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.SelectedFile, Mode=TwoWay}"
+                          SelectionMode="Single">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="viewmodels:LogFileItem">
+                            <StackPanel Padding="6,4">
+                                <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold"
+                                           FontFamily="Consolas"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8" Opacity="0.6">
+                                    <TextBlock Text="{x:Bind Modified}" FontSize="11"/>
+                                    <TextBlock Text="{x:Bind DisplaySize}" FontSize="11"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Border>
+
+            <!-- Содержимое лога -->
+            <Border Grid.Column="1" BorderThickness="1" CornerRadius="8" Padding="8"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <ScrollViewer x:Name="LogScroll" VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Auto">
+                    <TextBlock Text="{x:Bind ViewModel.Content, Mode=OneWay}"
+                               FontFamily="Consolas" FontSize="12"
+                               TextWrapping="NoWrap" IsTextSelectionEnabled="True"/>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
 </Page>

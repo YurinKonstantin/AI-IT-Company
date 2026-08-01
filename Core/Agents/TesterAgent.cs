@@ -21,7 +21,7 @@ public sealed class TesterAgent : AgentBase
     public override AgentRole Role => AgentRole.Tester;
 
     protected override string DefaultSystemPrompt => """
-        Ты — Тестировщик. Пишешь юнит-тесты на xUnit для .NET 8+.
+        Ты — Тестировщик. Пишешь юнит-тесты на xUnit для .NET 10.
 
         ПРАВИЛА:
         1. Используй xUnit + FluentAssertions + Moq (для моков зависимостей).
@@ -70,22 +70,22 @@ public sealed class TesterAgent : AgentBase
         var game = ctx.SharedData.GetValueOrDefault("game_code", "");
 
         return $"""
-        {stageContext}
+{stageContext}
 
-        === КОД ТЕКУЩЕГО ЭТАПА, КОТОРЫЙ НУЖНО ПОКРЫТЬ ТЕСТАМИ ===
+=== CURRENT STAGE CODE TO BE COVERED BY TESTS ===
 
-        --- Backend ---
-        {Trunc(backend, 6000)}
+--- Backend ---
+{Trunc(backend, 6000)}
 
-        --- Frontend ---
-        {Trunc(frontend, 3000)}
+--- Frontend ---
+{Trunc(frontend, 3000)}
 
-        --- Game ---
-        {Trunc(game, 3000)}
+--- Game ---
+{Trunc(game, 3000)}
 
-        Сгенерируй только тесты, относящиеся к КОДУ ТЕКУЩЕГО ЭТАПА.
-        Тесты пиши в проект Tests/, чтобы не смешивать с основным кодом.
-        """;
+Generate only tests related to the CURRENT STAGE code.
+Write tests in the Tests/ project to keep them separate from the main code.
+""";
 
         static string Trunc(string s, int max)
             => string.IsNullOrEmpty(s) ? "(пусто)" : s.Length <= max ? s : s[..max] + "\n…(обрезано)";

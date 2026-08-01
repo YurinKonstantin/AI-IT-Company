@@ -69,6 +69,7 @@ public partial class AgentConfigItem : ObservableObject
         AgentRole.Architect => "🏛 Архитектор",
         AgentRole.BackendCoder => "⚙ Кодер (Backend)",
         AgentRole.FrontendCoder => "🎨 Кодер (Frontend / WinUI)",
+        AgentRole.FullstackCoder => "🧑‍💻 Fullstack-Кодер (Backend+Frontend)",
         AgentRole.GameCoder => "🎮 Кодер (Monogame)",
         AgentRole.Tester => "🧪 Тестировщик",
         AgentRole.Builder => "🔧 Сборщик (DevOps)",
