@@ -29,6 +29,8 @@ namespace Core.Agents
       ([ObservableProperty], [RelayCommand]). Bindings — {x:Bind}.
     - Styles — ThemeResource, no hardcoded colors and no Windows.Forms/WPF/UWP API.
 
+    """ + WinUi3PromptRules.SystemRules + """
+
     KEY CONSISTENCY RULE:
     - First, design CONTRACTS (service interfaces, DTOs, namespace).
     - Then implement backend according to these contracts.

@@ -12,6 +12,11 @@
     <WinUISDKReferences>false</WinUISDKReferences>
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
+
+	  <SelfContained>true</SelfContained>
+	  <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+	  <PublishSingleFile>true</PublishSingleFile>
+	  <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="Views\AgentsConfigPage.xaml" />
@@ -57,9 +62,6 @@
 	  <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 
   </ItemGroup>
-	<ItemGroup>
-		<PackageReference Update="Microsoft.ML.OnnxRuntimeGenAI.DirectML" ExcludeAssets="all" />
-	</ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ai\Ai.csproj" />
     <ProjectReference Include="..\Build\Build.csproj" />
@@ -109,8 +111,8 @@
   <!-- Publish Properties -->
   <PropertyGroup>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">False</PublishReadyToRun>
     <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">False</PublishTrimmed>
   </PropertyGroup>
 </Project>

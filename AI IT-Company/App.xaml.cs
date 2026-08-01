@@ -56,9 +56,13 @@ namespace AI_IT_Company
                 s.AddDbContextFactory<AppDbContext>();
 
                 // Провайдеры AI
+                s.AddSingleton<WindowsCredentialStore>();
                 s.AddSingleton<OllamaProvider>(_ => new OllamaProvider("http://localhost:11434"));
-                //s.AddSingleton<OnnxProvider>(_ => new OnnxProvider(
-                // System.IO.Path.Combine(AppContext.BaseDirectory, "Models")));
+                s.AddSingleton<OpenRouterProvider>(sp =>
+                    new OpenRouterProvider(
+                        sp.GetRequiredService<WindowsCredentialStore>(),
+                        "https://openrouter.ai/api/v1"));
+                s.AddSingleton<OnnxProvider>(_ => new OnnxProvider(PathHelper.ModelsRoot));
 
                 // Фабрика — через ИНТЕРФЕЙС
                 s.AddSingleton<IAiProviderFactory, AiProviderFactory>();
@@ -120,7 +124,13 @@ namespace AI_IT_Company
             var url = appSettings.Get(AppSettingsStore.KeyOllamaUrl,
                                       AppSettingsStore.KeyOllamaDefaultUrl);
             Host.Services.GetRequiredService<OllamaClient>().SetBaseUrl(url);
-            // (Опционально) обновите OllamaProvider тем же URL, если он не читает у клиента.
+            Host.Services.GetRequiredService<OllamaProvider>().SetBaseUrl(url);
+
+            var openRouterUrl = appSettings.GetOpenRouterBaseUrl();
+            Host.Services.GetRequiredService<OpenRouterProvider>().SetBaseUrl(openRouterUrl);
+
+            var onnxPath = appSettings.GetOnnxModelsPath();
+            Host.Services.GetRequiredService<OnnxProvider>().SetModelsRoot(onnxPath);
 
             await Host.Services.GetRequiredService<AgentConfigStore>().InitializeAsync();
             await Host.Services.GetRequiredService<AgentPromptStore>().InitializeAsync();
@@ -133,6 +143,6 @@ namespace AI_IT_Company
                 .AttachUi(MainWindow.DispatcherQueue);
         }
     }
- }
+}
 
 

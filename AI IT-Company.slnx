@@ -10,8 +10,16 @@
     <Platform Solution="*|x86" Project="x86" />
     <Deploy />
   </Project>
-  <Project Path="Ai/Ai.csproj" />
-  <Project Path="Build/Build.csproj" />
-  <Project Path="Core/Core.csproj" />
-  <Project Path="Data/Data.csproj" />
+  <Project Path="Ai/Ai.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="Build/Build.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="Core/Core.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="Data/Data.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
 </Solution>

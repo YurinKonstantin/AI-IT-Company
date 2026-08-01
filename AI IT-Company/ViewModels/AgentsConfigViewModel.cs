@@ -27,7 +27,7 @@ public partial class AgentConfigItem : ObservableObject
     [ObservableProperty] private bool isDirty;
     [ObservableProperty] private string statusText = "";
 
-    public IReadOnlyList<string> AvailableSources { get; } = new[] { "Ollama" };
+    public IReadOnlyList<string> AvailableSources { get; } = new[] { "Ollama", "OpenRouter", "ONNX" };
 
     public AgentConfigItem(AgentRole role, AgentSettings s)
     {

@@ -11,25 +11,48 @@ using System.Threading.Tasks;
 
 namespace Ai;
 
-public sealed class OllamaProvider : IAiProvider
+public sealed class OllamaProvider : IAiProvider, IDisposable
 {
-    private readonly HttpClient _http;
+    private HttpClient _http;
+    private readonly object _httpLock = new();
+
     public string Name => "Ollama";
+    public string BaseUrl { get; private set; }
 
     public OllamaProvider(string baseUrl = "http://localhost:11434")
     {
-        _http = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = Timeout.InfiniteTimeSpan };
+        BaseUrl = Normalize(baseUrl);
+        _http = Create(BaseUrl);
+    }
+
+    public void SetBaseUrl(string baseUrl)
+    {
+        var url = Normalize(baseUrl);
+        lock (_httpLock)
+        {
+            if (string.Equals(BaseUrl, url, StringComparison.OrdinalIgnoreCase))
+                return;
+            BaseUrl = url;
+            _http.Dispose();
+            _http = Create(url);
+        }
     }
 
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
     {
-        try { var r = await _http.GetAsync("/api/tags", ct); return r.IsSuccessStatusCode; }
+        try
+        {
+            var http = SnapshotHttp();
+            var r = await http.GetAsync("/api/tags", ct);
+            return r.IsSuccessStatusCode;
+        }
         catch { return false; }
     }
 
     public async IAsyncEnumerable<string> GenerateStreamAsync(
         AiRequest request, [EnumeratorCancellation] CancellationToken ct = default)
     {
+        var http = SnapshotHttp();
         var body = new
         {
             model = request.ModelName,
@@ -46,7 +69,7 @@ public sealed class OllamaProvider : IAiProvider
 
         using var req = new HttpRequestMessage(HttpMethod.Post, "/api/generate")
         { Content = JsonContent.Create(body) };
-        using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
         resp.EnsureSuccessStatusCode();
 
         using var stream = await resp.Content.ReadAsStreamAsync(ct);
@@ -61,4 +84,20 @@ public sealed class OllamaProvider : IAiProvider
             if (doc.RootElement.TryGetProperty("done", out var d) && d.GetBoolean()) break;
         }
     }
+
+    public void Dispose() => _http.Dispose();
+
+    private HttpClient SnapshotHttp()
+    {
+        lock (_httpLock) return _http;
+    }
+
+    private static string Normalize(string baseUrl)
+        => (baseUrl ?? "").Trim().TrimEnd('/');
+
+    private static HttpClient Create(string url) => new()
+    {
+        BaseAddress = new Uri(url),
+        Timeout = Timeout.InfiniteTimeSpan
+    };
 }

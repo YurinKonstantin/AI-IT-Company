@@ -1,4 +1,5 @@
-﻿using Data;
+﻿using Core;
+using Data;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -20,6 +21,11 @@ namespace Core.Configuration
         public const string KeyCoderMode = "CoderMode";
         public const string KeyCoderModeDefault = "Unified";
 
+        public const string KeyOpenRouterBaseUrl = "OpenRouterBaseUrl";
+        public const string KeyOpenRouterDefaultUrl = "https://openrouter.ai/api/v1";
+        public const string KeyOnnxModelsPath = "OnnxModelsPath";
+        public const string KeyDefaultAiProvider = "DefaultAiProvider";
+        public const string KeyDefaultAiProviderDefault = "Ollama";
 
         public const string KeyTranslationEnabled = "TranslationEnabled";
         public const string KeyUserLanguage = "UserLanguage";      // "ru", "zh", "es", ...
@@ -85,7 +91,25 @@ namespace Core.Configuration
         public string GetUserLanguage() => Get(KeyUserLanguage, "Russian");
         public string GetWorkingLanguage() => Get(KeyWorkingLanguage, KeyWorkingLanguageDefault);
 
-        public Task SetUserLanguageAsync(string v) => SetAsync(KeyUserLanguage, v); public Task SetWorkingLanguageAsync(string v) => SetAsync(KeyWorkingLanguage, v);
+        public Task SetUserLanguageAsync(string v) => SetAsync(KeyUserLanguage, v);
+        public Task SetWorkingLanguageAsync(string v) => SetAsync(KeyWorkingLanguage, v);
 
+        public string GetOpenRouterBaseUrl() =>
+            Get(KeyOpenRouterBaseUrl, KeyOpenRouterDefaultUrl);
+
+        public Task SetOpenRouterBaseUrlAsync(string url) =>
+            SetAsync(KeyOpenRouterBaseUrl, url);
+
+        public string GetOnnxModelsPath() =>
+            Get(KeyOnnxModelsPath, PathHelper.ModelsRoot);
+
+        public Task SetOnnxModelsPathAsync(string path) =>
+            SetAsync(KeyOnnxModelsPath, path);
+
+        public string GetDefaultAiProvider() =>
+            Get(KeyDefaultAiProvider, KeyDefaultAiProviderDefault);
+
+        public Task SetDefaultAiProviderAsync(string provider) =>
+            SetAsync(KeyDefaultAiProvider, provider);
     }
 }

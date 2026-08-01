@@ -31,6 +31,13 @@ public sealed class FrontendCoderAgent : AgentBase
     5. Asynchrony: async Task in commands, DispatcherQueue for UI thread.
     6. No Windows.Forms / WPF / UWP-specific APIs.
 
+    """ + WinUi3PromptRules.SystemRules + """
+
+    TYPICAL LAYOUT:
+    - MainWindow.xaml — Window shell + Frame / NavigationView (size here only).
+    - Views/FeaturePage.xaml + .xaml.cs — Page with public ViewModel property.
+    - ViewModels/FeatureViewModel.cs — [ObservableProperty] / [RelayCommand].
+
     RESPONSE FORMAT (strict):
     - For each file — separate block:
     ```xaml:Views/SomePage.xaml

@@ -4,6 +4,7 @@ using Core.Contracts;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -95,8 +96,67 @@ namespace Core.Agents
             if (bcode != 0)
                 Logger.LogWarning("[Scaffolder] Baseline-сборка не прошла. Кодерам будет труднее.");
 
+            // Ключевые файлы каркаса — в SharedData, чтобы кодеры видели реальный WinUI/шаблон,
+            // а не подставляли WPF/UWP из обучающих данных.
+            var scaffoldFiles = CollectScaffoldSnippets(outputRoot, projectName);
+            if (!string.IsNullOrWhiteSpace(scaffoldFiles))
+                ctx.SharedData["scaffold_files"] = scaffoldFiles;
+
             return new AgentResult(true,
                 $"Каркас {template.DisplayName} создан в {outputRoot} (проект {projectName}).");
+        }
+
+        /// <summary>
+        /// Читает точки входа шаблона (App / MainWindow / Program) для передачи кодерам.
+        /// </summary>
+        private static string CollectScaffoldSnippets(string outputRoot, string projectName)
+        {
+            var candidates = new[]
+            {
+                "App.xaml",
+                "App.xaml.cs",
+                "MainWindow.xaml",
+                "MainWindow.xaml.cs",
+                "Program.cs",
+                Path.Combine(projectName, "App.xaml"),
+                Path.Combine(projectName, "App.xaml.cs"),
+                Path.Combine(projectName, "MainWindow.xaml"),
+                Path.Combine(projectName, "MainWindow.xaml.cs"),
+                Path.Combine(projectName, "Program.cs"),
+            };
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var sb = new StringBuilder();
+            const int maxPerFile = 2500;
+
+            foreach (var rel in candidates)
+            {
+                var full = Path.Combine(outputRoot, rel);
+                if (!File.Exists(full)) continue;
+
+                var normalized = Path.GetFullPath(full);
+                if (!seen.Add(normalized)) continue;
+
+                try
+                {
+                    var content = File.ReadAllText(full);
+                    if (content.Length > maxPerFile)
+                        content = content[..maxPerFile] + "\n...(обрезано)";
+
+                    var displayRel = Path.GetRelativePath(outputRoot, full).Replace('\\', '/');
+                    var lang = full.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase) ? "xaml" : "csharp";
+                    sb.AppendLine($"```{lang}:{displayRel}");
+                    sb.AppendLine(content);
+                    sb.AppendLine("```");
+                    sb.AppendLine();
+                }
+                catch
+                {
+                    /* ignore unreadable */
+                }
+            }
+
+            return sb.ToString().TrimEnd();
         }
 
         private static string SanitizeName(string s)

@@ -42,6 +42,13 @@ public sealed class ErrorFixerAgent : AgentBase
         6. Do not invent APIs that do not exist. If in doubt, use a proven approach.
         7. Preserve existing logic; change the minimum required to fix the issue.
 
+    When the project is WinUI 3, also apply:
+    """ + WinUi3PromptRules.SystemRules + """
+    Common WinUI fix patterns:
+    - System.Windows.* / Windows.UI.Xaml.* → Microsoft.UI.Xaml.*
+    - Width/Height on Page → remove; set size on Window if needed
+    - DataContext assignments → Page.ViewModel property + {x:Bind} + x:DataType
+
        PROHIBITED:
         - Returning diff-hunks (@@ ... @@).
         - Returning only class fragments.

@@ -13,11 +13,29 @@
 
             <TextBlock Text="⚙ Настройки" Style="{ThemeResource TitleTextBlockStyle}"/>
 
-            <!-- ============= OLLAMA ============= -->
+            <!-- ============= AI PROVIDERS ============= -->
             <Border BorderThickness="1" CornerRadius="8" Padding="16"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Ollama" FontSize="18" FontWeight="SemiBold"/>
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Провайдеры AI" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                               Text="Приоритет — локальный запуск (Ollama / ONNX). OpenRouter — облачный запасной вариант. Источник для каждого агента выбирается на странице «Агенты»."/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ComboBox Header="Провайдер по умолчанию"
+                                  MinWidth="220"
+                                  ItemsSource="{x:Bind ViewModel.AiProviderOptions}"
+                                  SelectedItem="{x:Bind ViewModel.DefaultAiProvider, Mode=TwoWay}"/>
+                        <Button Content="💾 Сохранить"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Command="{x:Bind ViewModel.SaveDefaultProviderCommand}"
+                                VerticalAlignment="Bottom"/>
+                        <TextBlock Text="{x:Bind ViewModel.DefaultProviderStatus, Mode=OneWay}"
+                                   VerticalAlignment="Bottom" Opacity="0.75" Margin="0,0,0,8"/>
+                    </StackPanel>
+
+                    <!-- Ollama -->
+                    <TextBlock Text="Ollama (локально)" FontWeight="SemiBold"/>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBox PlaceholderText="http://localhost:11434"
                                  Header="URL сервера"
@@ -31,8 +49,61 @@
                                 Command="{x:Bind ViewModel.CheckOllamaCommand}"
                                 VerticalAlignment="Bottom"/>
                     </StackPanel>
-                    <TextBlock Text="{x:Bind ViewModel.OllamaStatus, Mode=OneWay}"
-                               Opacity="0.85"/>
+                    <TextBlock Text="{x:Bind ViewModel.OllamaStatus, Mode=OneWay}" Opacity="0.85"/>
+
+                    <!-- OpenRouter -->
+                    <TextBlock Text="OpenRouter (интернет)" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                    <TextBox PlaceholderText="https://openrouter.ai/api/v1"
+                             Header="Base URL"
+                             Width="480"
+                             HorizontalAlignment="Left"
+                             Text="{x:Bind ViewModel.OpenRouterBaseUrl, Mode=TwoWay}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PasswordBox x:Name="OpenRouterKeyBox"
+                                     Header="API key (Windows Credential Locker)"
+                                     Width="380"
+                                     PasswordChanged="OpenRouterKeyBox_PasswordChanged"/>
+                        <Button Content="💾 Сохранить"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Command="{x:Bind ViewModel.SaveOpenRouterCommand}"
+                                VerticalAlignment="Bottom"/>
+                        <Button Content="🔌 Проверить"
+                                Command="{x:Bind ViewModel.CheckOpenRouterCommand}"
+                                VerticalAlignment="Bottom"/>
+                        <Button Content="🗑 Удалить ключ"
+                                Command="{x:Bind ViewModel.ClearOpenRouterKeyCommand}"
+                                VerticalAlignment="Bottom"/>
+                    </StackPanel>
+                    <TextBlock Opacity="0.7" Text="{x:Bind ViewModel.OpenRouterKeyHint, Mode=OneWay}"/>
+                    <TextBlock Text="{x:Bind ViewModel.OpenRouterStatus, Mode=OneWay}" Opacity="0.85"/>
+
+                    <!-- ONNX -->
+                    <TextBlock Text="ONNX / Windows ML (локально, Microsoft ML)" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                               Text="Положите папку модели с genai_config.json в корень ниже. В настройках агента укажите имя подпапки как ModelName."/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBox Header="Папка моделей"
+                                 Width="480"
+                                 Text="{x:Bind ViewModel.OnnxModelsPath, Mode=TwoWay}"/>
+                        <Button Content="📁 Обзор"
+                                Command="{x:Bind ViewModel.BrowseOnnxFolderCommand}"
+                                VerticalAlignment="Bottom"/>
+                        <Button Content="💾 Сохранить"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Command="{x:Bind ViewModel.SaveOnnxCommand}"
+                                VerticalAlignment="Bottom"/>
+                        <Button Content="🔌 Проверить"
+                                Command="{x:Bind ViewModel.CheckOnnxCommand}"
+                                VerticalAlignment="Bottom"/>
+                    </StackPanel>
+                    <TextBlock Text="{x:Bind ViewModel.OnnxStatus, Mode=OneWay}" Opacity="0.85"/>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.OnnxModelFolders}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock FontFamily="Consolas" Opacity="0.8" Text="{Binding}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
             <!-- ============= РЕЖИМ КОДЕРОВ ============= -->

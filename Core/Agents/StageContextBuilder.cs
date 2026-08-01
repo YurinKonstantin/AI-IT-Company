@@ -8,6 +8,26 @@ namespace Core.Agents
 {
     internal static class StageContextBuilder
     {
+        private static string BuildWinUiSection(AgentContext ctx, string scaffoldTemplate)
+        {
+            if (!WinUi3PromptRules.IsWinUiScaffold(scaffoldTemplate, ctx.Type))
+                return "";
+
+            var sb = new StringBuilder();
+            sb.AppendLine("=== WINUI 3 ПРАВИЛА ===");
+            sb.AppendLine(WinUi3PromptRules.UserPromptRules);
+
+            if (ctx.SharedData.TryGetValue("scaffold_files", out var scaffoldFiles)
+                && !string.IsNullOrWhiteSpace(scaffoldFiles))
+            {
+                sb.AppendLine();
+                sb.AppendLine("=== ФАЙЛЫ КАРКАСА (уже на диске — правь поверх, не заменяй на WPF/UWP) ===");
+                sb.AppendLine(Truncate(scaffoldFiles, 8000));
+            }
+
+            return sb.ToString();
+        }
+
         /// <summary>
         /// Возвращает секцию с кодом, уже написанным предыдущими кодерами на этом этапе.
         /// Для Backend — пусто (он первый). Для Frontend — Backend. Для Game — Backend+Frontend.
@@ -80,6 +100,7 @@ namespace Core.Agents
             // НОВОЕ: собираем код, уже сгенерированный на этом этапе предыдущими кодерами.
             // Frontend увидит Backend, Game увидит и Backend, и Frontend, Tester — всех.
             var priorCode = BuildPriorCodeSection(ctx, coderRole);
+            var winUiSection = BuildWinUiSection(ctx, scaffoldTemplate);
 
             return $"""
         === РОЛЬ ===
@@ -96,6 +117,8 @@ namespace Core.Agents
 
         {priorCode}
 
+        {winUiSection}
+
         === ПРАВИЛА ===
         1. В корне проекта УЖЕ создан каркас через `dotnet new`.
            - Шаблон: `{scaffoldTemplate}`
@@ -111,7 +134,7 @@ namespace Core.Agents
            Каждая новая строка начинается с "+ " и будет вставлена в существующий
            `<ItemGroup>`. Ничего другого в diff-блоке не пиши.
 
-        3. Точки входа шаблона (Program.cs / App.xaml / App.xaml.cs / Game1.cs
+        3. Точки входа шаблона (Program.cs / App.xaml / App.xaml.cs / MainWindow.xaml / Game1.cs
            и др., сгенерированные `dotnet new`) МЕНЯЙ ТОЛЬКО ТОЧЕЧНО:
            - добавляй using и вызовы регистрации,
            - НЕ удаляй существующий bootstrap-код шаблона,

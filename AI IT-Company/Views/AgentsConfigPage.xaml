@@ -61,8 +61,10 @@
                           SelectedItem="{x:Bind Source, Mode=TwoWay}"
                           HorizontalAlignment="Stretch"/>
                                 <TextBox Grid.Column="1" Header="Название модели"
-                         PlaceholderText="напр. qwen2.5-coder:7b"
+                         PlaceholderText="Ollama: qwen2.5-coder:7b · OpenRouter: qwen/qwen3-coder:free · ONNX: имя папки"
                          Text="{x:Bind ModelName, Mode=TwoWay}"/>
+                                <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Opacity="0.65" TextWrapping="Wrap"
+                           Text="Ollama — тег модели; OpenRouter — slug (напр. qwen/qwen3-coder:free); ONNX — имя подпапки в папке моделей из Настроек."/>
 
                                 <NumberBox Grid.Row="1" Header="Таймаут ответа, сек (0 = ∞)"
                            Minimum="0" Maximum="86400" SpinButtonPlacementMode="Inline"

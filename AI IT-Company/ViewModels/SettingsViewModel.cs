@@ -6,11 +6,12 @@ using Core.Configuration;
 using Core.Contracts;
 using Microsoft.UI.Dispatching;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Text;
+using System.Linq;
 using System.Threading.Tasks;
-using System.Transactions;
+using Windows.Storage.Pickers;
+using WinRT.Interop;
+using AppRoot = AI_IT_Company.App;
 
 namespace AI_IT_Company.ViewModels
 {
@@ -18,15 +19,20 @@ namespace AI_IT_Company.ViewModels
     {
         private readonly AppSettingsStore _settings;
         private readonly OllamaClient _client;
+        private readonly OllamaProvider _ollamaProvider;
+        private readonly OpenRouterProvider _openRouterProvider;
+        private readonly OnnxProvider _onnxProvider;
+        private readonly WindowsCredentialStore _credentials;
         private readonly AgentPromptStore _promptStore;
         private readonly DispatcherQueue _ui;
 
         public string[] CoderModeOptions { get; } =
-{
-    "🧑‍🤝‍🧑 Два кодера: Backend + Frontend (последовательно)",
-    "🧑‍💻 Один универсальный Fullstack-кодер"
-};
+        {
+            "🧑‍🤝‍🧑 Два кодера: Backend + Frontend (последовательно)",
+            "🧑‍💻 Один универсальный Fullstack-кодер"
+        };
 
+        public string[] AiProviderOptions { get; } = { "Ollama", "OpenRouter", "ONNX" };
 
         [ObservableProperty] private bool translationEnabled = true;
         [ObservableProperty] private string userLanguage = "Russian";
@@ -37,10 +43,7 @@ namespace AI_IT_Company.ViewModels
             { "English", "Russian", "Chinese", "Spanish", "German", "French",
       "Portuguese", "Japanese", "Korean", "Italian", "Ukrainian", "Polish" };
 
-
-     
-
-[RelayCommand]
+        [RelayCommand]
         private async Task SaveTranslationAsync()
         {
             await _settings.SetTranslationEnabledAsync(TranslationEnabled);
@@ -51,16 +54,32 @@ namespace AI_IT_Company.ViewModels
                 : "⏸ Перевод отключён";
         }
 
-
-
-        // В поля класса:
-        [ObservableProperty] private int coderModeIndex;  // 0 = Split, 1 = Unified
+        [ObservableProperty] private int coderModeIndex;
         [ObservableProperty] private string coderModeStatus = "";
+
+        // --- Default provider ---
+        [ObservableProperty] private string defaultAiProvider = "Ollama";
+        [ObservableProperty] private string defaultProviderStatus = "";
 
         // --- Ollama ---
         [ObservableProperty] private string ollamaUrl = "";
         [ObservableProperty] private string ollamaStatus = "";
         [ObservableProperty] private bool isOllamaOk;
+
+        // --- OpenRouter ---
+        [ObservableProperty] private string openRouterBaseUrl = "";
+        /// <summary>Черновик ключа из PasswordBox (не сохраняется в SQLite).</summary>
+        [ObservableProperty] private string openRouterApiKeyInput = "";
+        [ObservableProperty] private bool hasOpenRouterApiKey;
+        [ObservableProperty] private string openRouterKeyHint = "";
+        [ObservableProperty] private string openRouterStatus = "";
+        [ObservableProperty] private bool isOpenRouterOk;
+
+        // --- ONNX ---
+        [ObservableProperty] private string onnxModelsPath = "";
+        [ObservableProperty] private string onnxStatus = "";
+        [ObservableProperty] private bool isOnnxOk;
+        public ObservableCollection<string> OnnxModelFolders { get; } = new();
 
         // --- Шаблоны ---
         public ObservableCollection<TemplateStatusItem> Templates { get; } = new();
@@ -73,23 +92,49 @@ namespace AI_IT_Company.ViewModels
         public SettingsViewModel(
             AppSettingsStore settings,
             OllamaClient client,
+            OllamaProvider ollamaProvider,
+            OpenRouterProvider openRouterProvider,
+            OnnxProvider onnxProvider,
+            WindowsCredentialStore credentials,
             AgentPromptStore promptStore)
         {
             _settings = settings;
             _client = client;
+            _ollamaProvider = ollamaProvider;
+            _openRouterProvider = openRouterProvider;
+            _onnxProvider = onnxProvider;
+            _credentials = credentials;
             _promptStore = promptStore;
             _ui = DispatcherQueue.GetForCurrentThread()
                   ?? throw new InvalidOperationException("UI-поток нужен.");
 
             OllamaUrl = _settings.Get(AppSettingsStore.KeyOllamaUrl, AppSettingsStore.KeyOllamaDefaultUrl);
+            OpenRouterBaseUrl = _settings.GetOpenRouterBaseUrl();
+            OnnxModelsPath = _settings.GetOnnxModelsPath();
+            DefaultAiProvider = _settings.GetDefaultAiProvider();
+            HasOpenRouterApiKey = _credentials.HasSecret(WindowsCredentialStore.OpenRouterResource);
+            UpdateOpenRouterKeyHint();
+
             CoderModeIndex = _settings.GetCoderMode() == Core.Contracts.CoderMode.Unified ? 1 : 0;
             TranslationEnabled = _settings.GetTranslationEnabled();
             UserLanguage = _settings.GetUserLanguage();
             WorkingLanguage = _settings.GetWorkingLanguage();
             LoadTemplates();
             LoadPrompts();
+            RefreshOnnxFolderList();
             _ = RefreshTemplatesAsync();
             _ = CheckOllamaAsync();
+            _ = CheckOpenRouterAsync();
+            _ = CheckOnnxAsync();
+        }
+
+        // ---------- DEFAULT PROVIDER ----------
+        [RelayCommand]
+        private async Task SaveDefaultProviderAsync()
+        {
+            var p = string.IsNullOrWhiteSpace(DefaultAiProvider) ? "Ollama" : DefaultAiProvider.Trim();
+            await _settings.SetDefaultAiProviderAsync(p);
+            DefaultProviderStatus = $"💾 По умолчанию: {p}";
         }
 
         // ---------- OLLAMA ----------
@@ -104,6 +149,7 @@ namespace AI_IT_Company.ViewModels
             }
             await _settings.SetAsync(AppSettingsStore.KeyOllamaUrl, url);
             _client.SetBaseUrl(url);
+            _ollamaProvider.SetBaseUrl(url);
             OllamaStatus = "💾 Сохранено, проверяем…";
             await CheckOllamaAsync();
         }
@@ -111,10 +157,147 @@ namespace AI_IT_Company.ViewModels
         [RelayCommand]
         private async Task CheckOllamaAsync()
         {
-            IsOllamaOk = await _client.PingAsync();
+            IsOllamaOk = await _ollamaProvider.IsAvailableAsync();
             OllamaStatus = IsOllamaOk
-                ? $"✅ Соединение с {_client.BaseUrl} работает."
-                : $"❌ Не удалось подключиться к {_client.BaseUrl}.";
+                ? $"✅ Соединение с {_ollamaProvider.BaseUrl} работает."
+                : $"❌ Не удалось подключиться к {_ollamaProvider.BaseUrl}.";
+        }
+
+        // ---------- OPENROUTER ----------
+        [RelayCommand]
+        private async Task SaveOpenRouterAsync()
+        {
+            var url = (OpenRouterBaseUrl ?? "").Trim().TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out _))
+            {
+                OpenRouterStatus = "❌ Некорректный Base URL";
+                return;
+            }
+
+            await _settings.SetOpenRouterBaseUrlAsync(url);
+            _openRouterProvider.SetBaseUrl(url);
+
+            if (!string.IsNullOrWhiteSpace(OpenRouterApiKeyInput))
+            {
+                _credentials.SetSecret(WindowsCredentialStore.OpenRouterResource, OpenRouterApiKeyInput);
+                OpenRouterApiKeyInput = "";
+                HasOpenRouterApiKey = true;
+                UpdateOpenRouterKeyHint();
+            }
+
+            OpenRouterStatus = "💾 Сохранено, проверяем…";
+            await CheckOpenRouterAsync();
+        }
+
+        [RelayCommand]
+        private async Task CheckOpenRouterAsync()
+        {
+            HasOpenRouterApiKey = _credentials.HasSecret(WindowsCredentialStore.OpenRouterResource);
+            UpdateOpenRouterKeyHint();
+            if (!HasOpenRouterApiKey)
+            {
+                IsOpenRouterOk = false;
+                OpenRouterStatus = "⚠ API key не задан (хранится в Windows Credential Locker).";
+                return;
+            }
+
+            IsOpenRouterOk = await _openRouterProvider.IsAvailableAsync();
+            OpenRouterStatus = IsOpenRouterOk
+                ? $"✅ OpenRouter доступен ({_openRouterProvider.BaseUrl})."
+                : "❌ Не удалось подключиться к OpenRouter (проверьте ключ и сеть).";
+        }
+
+        [RelayCommand]
+        private void ClearOpenRouterKey()
+        {
+            _credentials.RemoveSecret(WindowsCredentialStore.OpenRouterResource);
+            HasOpenRouterApiKey = false;
+            IsOpenRouterOk = false;
+            OpenRouterApiKeyInput = "";
+            UpdateOpenRouterKeyHint();
+            OpenRouterStatus = "🗑 API key удалён из Credential Locker.";
+        }
+
+        private void UpdateOpenRouterKeyHint()
+        {
+            OpenRouterKeyHint = HasOpenRouterApiKey
+                ? "Ключ сохранён в Windows Credential Locker. Введите новый, чтобы заменить."
+                : "Ключ ещё не сохранён. Вставьте API key и нажмите «Сохранить».";
+        }
+
+        // ---------- ONNX ----------
+        [RelayCommand]
+        private async Task SaveOnnxAsync()
+        {
+            var path = (OnnxModelsPath ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                OnnxStatus = "❌ Укажите папку моделей";
+                return;
+            }
+
+            try
+            {
+                System.IO.Directory.CreateDirectory(path);
+            }
+            catch (Exception ex)
+            {
+                OnnxStatus = "❌ " + ex.Message;
+                return;
+            }
+
+            await _settings.SetOnnxModelsPathAsync(path);
+            _onnxProvider.SetModelsRoot(path);
+            RefreshOnnxFolderList();
+            OnnxStatus = "💾 Сохранено, проверяем…";
+            await CheckOnnxAsync();
+        }
+
+        [RelayCommand]
+        private async Task BrowseOnnxFolderAsync()
+        {
+            try
+            {
+                var picker = new FolderPicker();
+                picker.SuggestedStartLocation = PickerLocationId.ComputerFolder;
+                picker.FileTypeFilter.Add("*");
+
+                var hwnd = WindowNative.GetWindowHandle(AppRoot.MainWindowRef);
+                InitializeWithWindow.Initialize(picker, hwnd);
+
+                var folder = await picker.PickSingleFolderAsync();
+                if (folder is null) return;
+
+                OnnxModelsPath = folder.Path;
+                await SaveOnnxAsync();
+            }
+            catch (Exception ex)
+            {
+                OnnxStatus = "❌ " + ex.Message;
+            }
+        }
+
+        [RelayCommand]
+        private async Task CheckOnnxAsync()
+        {
+            IsOnnxOk = await _onnxProvider.IsAvailableAsync();
+            RefreshOnnxFolderList();
+            if (!IsOnnxOk)
+            {
+                OnnxStatus = $"❌ Папка не найдена: {_onnxProvider.ModelsRoot}";
+                return;
+            }
+
+            OnnxStatus = OnnxModelFolders.Count == 0
+                ? $"✅ Папка OK ({_onnxProvider.ModelsRoot}). Подпапок моделей пока нет — положите GenAI-модель вручную."
+                : $"✅ Папка OK. Найдено моделей: {OnnxModelFolders.Count} ({string.Join(", ", OnnxModelFolders.Take(5))}{(OnnxModelFolders.Count > 5 ? "…" : "")}).";
+        }
+
+        private void RefreshOnnxFolderList()
+        {
+            OnnxModelFolders.Clear();
+            foreach (var name in _onnxProvider.ListLocalModelFolders())
+                OnnxModelFolders.Add(name);
         }
 
         // ---------- TEMPLATES ----------
@@ -216,7 +399,6 @@ namespace AI_IT_Company.ViewModels
             item.Status = "↺ Сброшено";
         }
 
-        // ---------- ROLE TITLES ----------
         private static string RoleTitle(AgentRole r) => r switch
         {
             AgentRole.Interpreter => "🧭 Интерпретатор",
