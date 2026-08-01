@@ -186,7 +186,12 @@ namespace AI_IT_Company.Services
                 }
             });
 
-            if (ev.Kind is "done" or "stage-summary" && ev.Payload.Length > 200 && _translator.IsEnabled)
+            // Architect/Secretary уже локализуют Output в агенте — повторный ToUserAsync не нужен.
+            // "stage-summary" мёртвое: пайплайн шлёт "stages-summary" (уже на языке UI).
+            if (ev.Kind is "done"
+                && ev.Role is not AgentRole.Architect and not AgentRole.Secretary
+                && ev.Payload.Length > 200
+                && _translator.IsEnabled)
             {
                 _ = Task.Run(async () =>
                 {
