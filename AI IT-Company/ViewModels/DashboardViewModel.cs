@@ -1,10 +1,8 @@
 ﻿using AI_IT_Company.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
+using System.Threading.Tasks;
 
 namespace AI_IT_Company.ViewModels
 {
@@ -16,6 +14,13 @@ namespace AI_IT_Company.ViewModels
 
         [RelayCommand]
         private void Stop() => Runner.Stop();
+
+        [RelayCommand]
+        private async Task RetryFailedStageAsync()
+        {
+            if (!Runner.CanRetryLastFailedStage) return;
+            await Runner.RetryLastFailedStageAsync();
+        }
 
         [RelayCommand]
         private void OpenFolder()

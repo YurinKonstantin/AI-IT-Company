@@ -113,6 +113,19 @@ public sealed class AgentConfigStore
     public Task ResetAsync(AgentRole role, CancellationToken ct = default)
         => SaveAsync(role, Default(role), ct);
 
+    /// <summary>
+    /// Применить пресет моделей ко всем ролям.
+    /// compact — слабый/средний ПК (7b); balanced — 14b на ключевых ролях.
+    /// </summary>
+    public async Task ApplyPresetAsync(string profile, CancellationToken ct = default)
+    {
+        foreach (AgentRole role in Enum.GetValues<AgentRole>())
+        {
+            await SaveAsync(role, Preset(profile, role), ct);
+        }
+        _logger.LogInformation("Применён пресет моделей: {Profile}", profile);
+    }
+
     // ---------- маппинг ----------
     private static AgentSettings ToSettings(AgentConfigRecord r) => new()
     {
@@ -146,36 +159,57 @@ public sealed class AgentConfigStore
         ContextWindow = s.ContextWindow
     };
 
-    /// <summary>Разумные дефолты под каждую роль.</summary>
+    private static AgentSettings Preset(string profile, AgentRole role)
+        => string.Equals(profile, "balanced", StringComparison.OrdinalIgnoreCase)
+            ? Balanced(role)
+            : Default(role);
+
+    /// <summary>Разумные дефолты под каждую роль (compact / 7b).</summary>
     private static AgentSettings Default(AgentRole role) => role switch
     {
-        // Интерпретатор — маленький, быстрый, детерминированный (JSON).
-        AgentRole.Interpreter => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.1 },
+        AgentRole.Interpreter => S("qwen2.5-coder:7b", 0.1),
+        AgentRole.Translator => S("qwen2.5-coder:7b", 0.1),
+        AgentRole.Architect => S("qwen2.5-coder:7b", 0.5),
+        AgentRole.BackendCoder => S("qwen2.5-coder:7b", 0.2),
+        AgentRole.FrontendCoder => S("qwen2.5-coder:7b", 0.2),
+        AgentRole.GameCoder => S("qwen2.5-coder:7b", 0.3),
+        AgentRole.FullstackCoder => S("qwen2.5-coder:7b", 0.3),
+        AgentRole.Tester => S("qwen2.5-coder:7b", 0.15),
+        AgentRole.Builder => S("qwen2.5-coder:7b", 0.0),
+        AgentRole.ErrorFixer => S("qwen2.5-coder:7b", 0.1),
+        AgentRole.Secretary => S("qwen2.5-coder:7b", 0.4),
+        AgentRole.Scaffolder => S("qwen2.5-coder:7b", 0.0),
+        AgentRole.Documenter => S("llama3.2:3b", 0.35),
+        AgentRole.Artist => S("qwen2.5-coder:7b", 0.45),
+        AgentRole.Analyst => S("llama3.2:3b", 0.35),
+        _ => S("qwen2.5-coder:7b", 0.2)
+    };
 
-        // Переводчик — маленький, быстрый, детерминированный (JSON).
-        AgentRole.Translator => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.1 },
+    /// <summary>Пресет balanced (≈16–24 GB): 14b на ключевых ролях.</summary>
+    private static AgentSettings Balanced(AgentRole role) => role switch
+    {
+        AgentRole.Interpreter => S("qwen2.5-coder:7b", 0.1),
+        AgentRole.Translator => S("qwen2.5-coder:7b", 0.1),
+        AgentRole.Architect => S("qwen2.5-coder:14b", 0.5),
+        AgentRole.BackendCoder => S("qwen2.5-coder:14b", 0.2),
+        AgentRole.FrontendCoder => S("qwen2.5-coder:14b", 0.2),
+        AgentRole.GameCoder => S("qwen2.5-coder:14b", 0.3),
+        AgentRole.FullstackCoder => S("qwen2.5-coder:14b", 0.3),
+        AgentRole.Tester => S("qwen2.5-coder:14b", 0.15),
+        AgentRole.Builder => S("qwen2.5-coder:7b", 0.0),
+        AgentRole.ErrorFixer => S("qwen2.5-coder:14b", 0.1),
+        AgentRole.Secretary => S("llama3.1:8b", 0.4),
+        AgentRole.Scaffolder => S("qwen2.5-coder:7b", 0.0),
+        AgentRole.Documenter => S("llama3.1:8b", 0.35),
+        AgentRole.Artist => S("qwen2.5-coder:14b", 0.45),
+        AgentRole.Analyst => S("llama3.1:8b", 0.35),
+        _ => S("qwen2.5-coder:14b", 0.2)
+    };
 
-        // Архитектор — креативнее.
-        AgentRole.Architect => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.5 },
-
-        // Кодеры — специализированные code-модели, низкая температура.
-        AgentRole.BackendCoder => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.2 },
-        AgentRole.FrontendCoder => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.2 },
-        AgentRole.GameCoder => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.3 },
-        AgentRole.FullstackCoder => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.3 },
-
-        // Тестировщик — строгий.
-        AgentRole.Tester => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.15 },
-
-        // Builder — LLM почти не нужна, ставим лёгкую.
-        AgentRole.Builder => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.0 },
-
-        // Исправитель — вдумчивый.
-        AgentRole.ErrorFixer => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.1 },
-
-        // Секретарь — тёплый текст.
-        AgentRole.Secretary => new() { Source = "Ollama", ModelName = "qwen2.5-coder:7b", Temperature = 0.4 },
-
-        _ => new()
+    private static AgentSettings S(string model, double temperature) => new()
+    {
+        Source = "Ollama",
+        ModelName = model,
+        Temperature = temperature
     };
 }

@@ -17,7 +17,10 @@ public enum AgentRole
     ErrorFixer,
     Secretary,
     Scaffolder,
-    Translator
+    Translator,
+    Documenter,
+    Artist,
+    Analyst
 }
 
 public interface IAgent

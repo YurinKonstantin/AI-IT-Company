@@ -101,6 +101,8 @@ namespace Core.Agents
             // Frontend увидит Backend, Game увидит и Backend, и Frontend, Tester — всех.
             var priorCode = BuildPriorCodeSection(ctx, coderRole);
             var winUiSection = BuildWinUiSection(ctx, scaffoldTemplate);
+            var assetsSection = BuildAssetsSection(ctx, coderRole);
+            var relevantFiles = RelevantContextBuilder.Build(ctx);
 
             return $"""
         === РОЛЬ ===
@@ -115,9 +117,13 @@ namespace Core.Agents
         === ТЗ (полное) ===
         {Truncate(tz, maxTz)}
 
+        {relevantFiles}
+
         {priorCode}
 
         {winUiSection}
+
+        {assetsSection}
 
         === ПРАВИЛА ===
         1. В корне проекта УЖЕ создан каркас через `dotnet new`.
@@ -172,6 +178,35 @@ namespace Core.Agents
         9. Не выдумывай API, которых не существует. Если сомневаешься —
            используй проверенный, стандартный подход из указанной технологии.
         """;
+        }
+
+        private static string BuildAssetsSection(AgentContext ctx, string coderRole)
+        {
+            var role = coderRole.ToLowerInvariant();
+            bool forGame = role.Contains("game") || role.Contains("гейм") || role.Contains("monogame");
+            if (!forGame) return "";
+
+            if (!ctx.SharedData.TryGetValue("artist_manifest", out var manifest)
+                || string.IsNullOrWhiteSpace(manifest))
+            {
+                return """
+                    === АССЕТЫ ===
+                    Манифест спрайтов отсутствует. Можно использовать Texture2D + SetData<Color>() как fallback.
+                    """;
+            }
+
+            return $"""
+                === АССЕТЫ (уже на диске — ОБЯЗАТЕЛЬНО загружай эти PNG) ===
+                Файлы: {ctx.SharedData.GetValueOrDefault("artist_assets", "")}
+
+                Манифест Content/assets.manifest.json:
+                {Truncate(manifest, 6000)}
+
+                Загрузка (пример):
+                using var stream = TitleContainer.OpenStream("Content/Sprites/player.png");
+                var tex = Texture2D.FromStream(GraphicsDevice, stream);
+                Не заменяй эти файлы цветными заглушками.
+                """;
         }
 
         private static string Truncate(string s, int max)

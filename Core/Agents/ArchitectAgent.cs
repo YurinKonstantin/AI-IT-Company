@@ -67,6 +67,17 @@ public sealed class ArchitectAgent : AgentBase
     - Each subsequent stage should only depend on previous ones where truly necessary.
     - Try to make stages as independent as possible — this is important for fault tolerance.
     - scope accepts values: "Backend", "Frontend", "Game", "Tests", "Docs".
+
+    DOCUMENTATION MODE (Mode=Document):
+    - Do NOT plan coding, scaffolding, tests, or build work.
+    - Produce 1–3 stages with scope ONLY ["Docs"].
+    - Focus on structure analysis, README, architecture notes, API docs.
+
+    IMPROVE MODE (Mode=Improve):
+    - The project ALREADY EXISTS. Do NOT plan greenfield scaffolding.
+    - Plan ONLY the delta requested by the user (enhancements/refactors).
+    - Prefer fewer stages (1–4). Reuse existing modules; avoid rewriting the whole app.
+    - Mention in summary what stays unchanged.
 """;
 
     public ArchitectAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore, ITranslationService translator,
@@ -75,18 +86,45 @@ public sealed class ArchitectAgent : AgentBase
 
     protected override string BuildUserPrompt(AgentContext ctx)
     {
-        var files = ctx.Files.Count > 0 ? string.Join("\n", ctx.Files.Take(50)) : "(new project)";
+        var files = ctx.Files.Count > 0 ? string.Join("\n", ctx.Files.Take(80)) : "(new project)";
+        var modeHint = ctx.Mode switch
+        {
+            WorkMode.Document => """
+              IMPORTANT: Mode is Document. Stages must use scope ["Docs"] only.
+              Do not include Backend, Frontend, Game, or Tests scopes.
+              """,
+            WorkMode.Improve => """
+              IMPORTANT: Mode is Improve. Plan ONLY changes to the existing codebase.
+              Do not assume a new empty project. Prefer small incremental stages.
+              Use structure/metrics below as ground truth about what already exists.
+              """,
+            _ => ""
+        };
+
+        var structure = Truncate(ctx.SharedData.GetValueOrDefault("project_structure", ""), 4000);
+        var metrics = Truncate(ctx.SharedData.GetValueOrDefault("project_metrics", ""), 2500);
+
         return $"""
             User task: {ctx.UserPrompt}
             Project type: {ctx.Type}
             Mode: {ctx.Mode}
+            {modeHint}
 
             Existing files:
             {files}
 
+            Project structure:
+            {structure}
+
+            Project metrics:
+            {metrics}
+
             Create a technical specification and a phased plan in the required JSON format.
             """;
     }
+
+    private static string Truncate(string s, int max)
+        => string.IsNullOrEmpty(s) ? "(none)" : s.Length <= max ? s : s[..max] + "\n…";
 
     protected override async Task<AgentResult> PostProcessAsync(
         AgentContext ctx, string output, CancellationToken ct)

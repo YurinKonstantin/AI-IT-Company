@@ -32,6 +32,13 @@ namespace Core.Configuration
         public const string KeyWorkingLanguage = "WorkingLanguage";   // язык, на котором работают агенты
         public const string KeyWorkingLanguageDefault = "English";
 
+        public const string KeyArtistImageMode = "ArtistImageMode";
+        public const string KeyArtistImageModeDefault = "Procedural";
+        public const string KeyArtistOpenRouterImageModel = "ArtistOpenRouterImageModel";
+        public const string KeyArtistOpenRouterImageModelDefault = "google/gemini-2.5-flash-image-preview";
+        public const string KeyArtistOllamaImageModel = "ArtistOllamaImageModel";
+        public const string KeyArtistOllamaImageModelDefault = "";
+
         public event EventHandler<string>? SettingChanged;
 
         public AppSettingsStore(IDbContextFactory<AppDbContext> dbFactory) => _dbFactory = dbFactory;
@@ -111,5 +118,27 @@ namespace Core.Configuration
 
         public Task SetDefaultAiProviderAsync(string provider) =>
             SetAsync(KeyDefaultAiProvider, provider);
+
+        public Core.Contracts.ArtistImageMode GetArtistImageMode()
+        {
+            var raw = Get(KeyArtistImageMode, KeyArtistImageModeDefault);
+            return Enum.TryParse<Core.Contracts.ArtistImageMode>(raw, ignoreCase: true, out var m)
+                ? m : Core.Contracts.ArtistImageMode.Procedural;
+        }
+
+        public Task SetArtistImageModeAsync(Core.Contracts.ArtistImageMode mode) =>
+            SetAsync(KeyArtistImageMode, mode.ToString());
+
+        public string GetArtistOpenRouterImageModel() =>
+            Get(KeyArtistOpenRouterImageModel, KeyArtistOpenRouterImageModelDefault);
+
+        public Task SetArtistOpenRouterImageModelAsync(string model) =>
+            SetAsync(KeyArtistOpenRouterImageModel, model ?? "");
+
+        public string GetArtistOllamaImageModel() =>
+            Get(KeyArtistOllamaImageModel, KeyArtistOllamaImageModelDefault);
+
+        public Task SetArtistOllamaImageModelAsync(string model) =>
+            SetAsync(KeyArtistOllamaImageModel, model ?? "");
     }
 }

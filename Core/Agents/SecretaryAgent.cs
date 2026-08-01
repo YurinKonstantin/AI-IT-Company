@@ -162,7 +162,8 @@ public sealed class SecretaryAgent : AgentBase
             ("game_code", "Game"),
             ("tests_code", "Tests"),
             ("fix_code", "Fixes"),
-            ("fullstack_code", "fullstack")
+            ("fullstack_code", "fullstack"),
+            ("docs_code", "Docs")
         })
         {
             if (!ctx.SharedData.TryGetValue(key, out var blob)) continue;
@@ -171,10 +172,42 @@ public sealed class SecretaryAgent : AgentBase
             sb.AppendLine($"- {label}: {count} файл(ов)");
         }
 
+        var docsFiles = ctx.SharedData.GetValueOrDefault("docs_files", "");
+        if (!string.IsNullOrWhiteSpace(docsFiles))
+            sb.AppendLine($"- Документация записана: {docsFiles}");
+
         sb.AppendLine($"- Всего сгенерировано/изменено файлов: {totalGenerated}");
         sb.AppendLine($"- Тестовых файлов: {ctx.SharedData.GetValueOrDefault("tests_files_count", "0")}");
         sb.AppendLine($"- Попыток авто-исправления: {ctx.SharedData.GetValueOrDefault("fixer_attempt", "0")}");
-        sb.AppendLine($"- Сборка: {(ctx.SharedData.GetValueOrDefault("build_ok", "unknown") == "true" ? "✅ успех" : "❌ провал")}");
+
+        if (ctx.Mode is WorkMode.Document or WorkMode.Analyze)
+            sb.AppendLine($"- Сборка: пропущена (режим {ctx.Mode})");
+        else
+            sb.AppendLine($"- Сборка: {(ctx.SharedData.GetValueOrDefault("build_ok", "unknown") == "true" ? "✅ успех" : "❌ провал")}");
+
+        var testOk = ctx.SharedData.GetValueOrDefault("test_ok", "");
+        if (!string.IsNullOrWhiteSpace(testOk))
+            sb.AppendLine($"- Тесты (acceptance): {testOk}");
+        var smokeOk = ctx.SharedData.GetValueOrDefault("smoke_ok", "");
+        if (!string.IsNullOrWhiteSpace(smokeOk))
+            sb.AppendLine($"- Smoke MonoGame: {smokeOk}");
+
+        var analysisPath = ctx.SharedData.GetValueOrDefault("analysis_path", "");
+        if (!string.IsNullOrWhiteSpace(analysisPath))
+            sb.AppendLine($"- ANALYSIS.md: {analysisPath}");
+
+        var nugetAdded = ctx.SharedData.GetValueOrDefault("nuget_packages_added", "");
+        if (!string.IsNullOrWhiteSpace(nugetAdded))
+            sb.AppendLine($"- Автоматически добавлены NuGet-пакеты: {nugetAdded}");
+
+        var artistAssets = ctx.SharedData.GetValueOrDefault("artist_assets", "");
+        if (!string.IsNullOrWhiteSpace(artistAssets))
+        {
+            sb.AppendLine($"- Спрайты (Artist): {ctx.SharedData.GetValueOrDefault("artist_assets_count", "?")} шт. → {artistAssets}");
+            var gen = ctx.SharedData.GetValueOrDefault("artist_generator", "");
+            if (!string.IsNullOrWhiteSpace(gen))
+                sb.AppendLine($"- Генератор спрайтов: {gen} (mode={ctx.SharedData.GetValueOrDefault("artist_image_mode", "?")})");
+        }
 
         var fixedFiles = ctx.SharedData.GetValueOrDefault("last_fixed_files", "");
         if (!string.IsNullOrWhiteSpace(fixedFiles))

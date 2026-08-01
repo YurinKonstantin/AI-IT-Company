@@ -16,10 +16,15 @@ namespace Core.Contracts
 
         public ProjectType Type { get; set; } = ProjectType.Unknown;
         public WorkMode Mode { get; set; } = WorkMode.CreateNew;
+
+        /// <summary>
+        /// Если true — режим выбран в UI и Interpreter не должен его перезаписывать.
+        /// </summary>
+        public bool ModeLocked { get; set; }
+
         public Dictionary<string, string> SharedData { get; } = new();
         public List<string> Files { get; } = new();
         public ProjectPlan? Plan { get; set; }
         public Stage? CurrentStage { get; set; }
-      
     }
 }

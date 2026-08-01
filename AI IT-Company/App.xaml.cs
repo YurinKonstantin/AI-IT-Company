@@ -64,6 +64,22 @@ namespace AI_IT_Company
                         "https://openrouter.ai/api/v1"));
                 s.AddSingleton<OnnxProvider>(_ => new OnnxProvider(PathHelper.ModelsRoot));
 
+                // Image-gen для Artist (OpenRouter / Ollama); procedural — fallback внутри ArtistAgent.
+                s.AddSingleton<IImageGenClient>(sp =>
+                {
+                    var settings = sp.GetRequiredService<AppSettingsStore>();
+                    var creds = sp.GetRequiredService<WindowsCredentialStore>();
+                    return new OpenRouterImageClient(
+                        creds,
+                        () => settings.GetOpenRouterBaseUrl());
+                });
+                s.AddSingleton<IImageGenClient>(sp =>
+                {
+                    var settings = sp.GetRequiredService<AppSettingsStore>();
+                    return new OllamaImageClient(
+                        () => settings.Get(AppSettingsStore.KeyOllamaUrl, AppSettingsStore.KeyOllamaDefaultUrl));
+                });
+
                 // Фабрика — через ИНТЕРФЕЙС
                 s.AddSingleton<IAiProviderFactory, AiProviderFactory>();
 
@@ -77,14 +93,17 @@ namespace AI_IT_Company
                 s.AddTransient<IAgent, FrontendCoderAgent>();
                 s.AddTransient<IAgent, FullstackCoderAgent>();
                 s.AddTransient<IAgent, GameCoderAgent>();
+                s.AddTransient<IAgent, ArtistAgent>();
                 s.AddTransient<IAgent, TesterAgent>();
                 s.AddTransient<IAgent, BuilderAgent>();
                 s.AddTransient<IAgent, ErrorFixerAgent>();
                 s.AddTransient<IAgent, SecretaryAgent>();
                 s.AddTransient<IAgent, ScaffolderAgent>();
+                s.AddTransient<IAgent, DocumenterAgent>();
+                s.AddTransient<IAgent, AnalystAgent>();
                // s.AddTransient<IAgent, TranslatorAgent>();
 
-                // s.AddTransient<AgentPipeline>();
+                // Legacy AgentPipeline намеренно не регистрируется — используем StagedPipeline.
                 s.AddTransient<StagedPipeline>();
                 s.AddTransient<AgentsConfigViewModel>();
                 s.AddSingleton<OllamaClient>(_ => new OllamaClient("http://localhost:11434"));

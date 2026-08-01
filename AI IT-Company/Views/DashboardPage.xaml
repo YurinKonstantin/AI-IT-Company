@@ -38,13 +38,14 @@
                     </StackPanel>
                 </InfoBar.Content>
                 <muxc:InfoBar.ActionButton>
-                    <!--<StackPanel Orientation="Horizontal" Spacing="6">-->
-                        <!--<Button Content="📂 Папка"
-                                Command="{x:Bind ViewModel.OpenFolderCommand}"/>-->
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Button Content="🔁 Повторить этап"
+                                Command="{x:Bind ViewModel.RetryFailedStageCommand}"
+                                IsEnabled="{x:Bind ViewModel.Runner.CanRetryLastFailedStage, Mode=OneWay}"/>
                         <Button Content="⏹ Остановить"
                                 Command="{x:Bind ViewModel.StopCommand}"
                                 IsEnabled="{x:Bind ViewModel.Runner.IsRunning, Mode=OneWay}"/>
-                    <!--</StackPanel>-->
+                    </StackPanel>
                 </muxc:InfoBar.ActionButton>
             </InfoBar>
 
@@ -124,6 +125,14 @@
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     Visibility="{x:Bind ViewModel.Runner.HasActiveProject, Mode=OneWay}">
                 <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="Режим:" Opacity="0.7"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.CurrentMode, Mode=OneWay}"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="·" Opacity="0.4"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runner.StatusText, Mode=OneWay}"
+                                   Opacity="0.9" TextWrapping="Wrap"/>
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <ProgressRing IsActive="{x:Bind ViewModel.Runner.IsRunning, Mode=OneWay}"
                                            Width="20" Height="20"/>

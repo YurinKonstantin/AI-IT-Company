@@ -57,6 +57,19 @@ namespace AI_IT_Company.ViewModels
         [ObservableProperty] private int coderModeIndex;
         [ObservableProperty] private string coderModeStatus = "";
 
+        // --- Artist image-gen ---
+        public string[] ArtistImageModeOptions { get; } =
+        {
+            "🎨 Procedural (локально, без API)",
+            "☁ OpenRouter (image API)",
+            "🦙 Ollama (локальная image-модель)"
+        };
+
+        [ObservableProperty] private int artistImageModeIndex;
+        [ObservableProperty] private string artistOpenRouterImageModel = "";
+        [ObservableProperty] private string artistOllamaImageModel = "";
+        [ObservableProperty] private string artistImageStatus = "";
+
         // --- Default provider ---
         [ObservableProperty] private string defaultAiProvider = "Ollama";
         [ObservableProperty] private string defaultProviderStatus = "";
@@ -116,6 +129,14 @@ namespace AI_IT_Company.ViewModels
             UpdateOpenRouterKeyHint();
 
             CoderModeIndex = _settings.GetCoderMode() == Core.Contracts.CoderMode.Unified ? 1 : 0;
+            ArtistImageModeIndex = _settings.GetArtistImageMode() switch
+            {
+                ArtistImageMode.OpenRouter => 1,
+                ArtistImageMode.Ollama => 2,
+                _ => 0
+            };
+            ArtistOpenRouterImageModel = _settings.GetArtistOpenRouterImageModel();
+            ArtistOllamaImageModel = _settings.GetArtistOllamaImageModel();
             TranslationEnabled = _settings.GetTranslationEnabled();
             UserLanguage = _settings.GetUserLanguage();
             WorkingLanguage = _settings.GetWorkingLanguage();
@@ -126,6 +147,33 @@ namespace AI_IT_Company.ViewModels
             _ = CheckOllamaAsync();
             _ = CheckOpenRouterAsync();
             _ = CheckOnnxAsync();
+        }
+
+        [RelayCommand]
+        private async Task SaveArtistImageAsync()
+        {
+            var mode = ArtistImageModeIndex switch
+            {
+                1 => ArtistImageMode.OpenRouter,
+                2 => ArtistImageMode.Ollama,
+                _ => ArtistImageMode.Procedural
+            };
+            await _settings.SetArtistImageModeAsync(mode);
+            await _settings.SetArtistOpenRouterImageModelAsync(
+                (ArtistOpenRouterImageModel ?? "").Trim());
+            await _settings.SetArtistOllamaImageModelAsync(
+                (ArtistOllamaImageModel ?? "").Trim());
+
+            ArtistImageStatus = mode switch
+            {
+                ArtistImageMode.OpenRouter =>
+                    $"💾 OpenRouter → {(string.IsNullOrWhiteSpace(ArtistOpenRouterImageModel) ? AppSettingsStore.KeyArtistOpenRouterImageModelDefault : ArtistOpenRouterImageModel)}",
+                ArtistImageMode.Ollama =>
+                    string.IsNullOrWhiteSpace(ArtistOllamaImageModel)
+                        ? "⚠ Режим Ollama, но модель не указана — будет procedural fallback"
+                        : $"💾 Ollama → {ArtistOllamaImageModel}",
+                _ => "💾 Procedural (локально)"
+            };
         }
 
         // ---------- DEFAULT PROVIDER ----------
@@ -412,6 +460,10 @@ namespace AI_IT_Company.ViewModels
             AgentRole.ErrorFixer => "🩹 Исправитель",
             AgentRole.Secretary => "📝 Секретарь",
             AgentRole.Scaffolder => "🏗 Скаффолдер",
+            AgentRole.Translator => "🌐 Переводчик",
+            AgentRole.Documenter => "📚 Документатор",
+            AgentRole.Artist => "🎨 Художник",
+            AgentRole.Analyst => "🔍 Аналитик",
             _ => r.ToString()
         };
 

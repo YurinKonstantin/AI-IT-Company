@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -33,42 +34,58 @@ namespace Core.Orchestration
 
         public async Task RunAsync(AgentContext ctx, CancellationToken ct)
         {
-            // 1) Интерпретация задачи
+            // 1) Интерпретация задачи (режим UI с ModeLocked не перезаписывается)
             await RunAgent(AgentRole.Interpreter, ctx, ct);
 
-            // 2) Архитектор формирует ТЗ + план + сохраняет TZ.md
-            
-            await RunAgent(AgentRole.Architect, ctx, ct);
-            if (ctx.Plan is null)
-            {
-                await Emit(AgentRole.Architect, "error", "План не сформирован — прекращаем.");
-                Events.Writer.TryComplete();
-                return;
-            }
-
-            // 3) Инициализация git и baseline-коммит
             var repo = ctx.OutputRoot
                     ?? ctx.ProjectPath
                     ?? PathHelper.GetProjectOutputRoot(ctx.ProjectId);
             ctx.OutputRoot = repo;
             PathHelper.EnsureDirectory(repo);
 
-            var gitAvailable = await GitService.IsAvailableAsync(ct);
-            if (!gitAvailable)
+            switch (ctx.Mode)
             {
-                await Emit(AgentRole.Builder, "warn", "git не установлен — работаем без версионирования.");
+                case WorkMode.Document:
+                    await RunDocumentationAsync(ctx, repo, ct);
+                    Events.Writer.TryComplete();
+                    return;
+
+                case WorkMode.Analyze:
+                    await RunAnalyzeAsync(ctx, repo, ct);
+                    Events.Writer.TryComplete();
+                    return;
+
+                case WorkMode.FixError:
+                    await RunFixErrorAsync(ctx, repo, ct);
+                    Events.Writer.TryComplete();
+                    return;
+
+                case WorkMode.Improve:
+                    await RunImproveAsync(ctx, repo, ct);
+                    Events.Writer.TryComplete();
+                    return;
+
+                default:
+                    // CreateNew — полный путь
+                    await RunCreateNewAsync(ctx, repo, ct);
+                    Events.Writer.TryComplete();
+                    return;
             }
-            else
+        }
+
+        private async Task RunCreateNewAsync(AgentContext ctx, string repo, CancellationToken ct)
+        {
+            await RunAgent(AgentRole.Architect, ctx, ct);
+            if (ctx.Plan is null)
             {
-                await GitService.InitIfNeededAsync(repo, ct);
-                var baseline = await GitService.CommitAllAsync(repo, "chore: baseline (TZ)", ct);
-                ctx.SharedData["baseline_sha"] = baseline ?? "";
-                await Emit(AgentRole.Builder, "git", $"baseline: {baseline}");
+                await Emit(AgentRole.Architect, "error", "План не сформирован — прекращаем.");
+                return;
             }
-            // 3.5) Скаффолдинг каркаса (только для новых проектов)
+
+            var gitAvailable = await InitGitBaselineAsync(repo, "chore: baseline (TZ)", ctx, ct);
+
             await RunAgent(AgentRole.Scaffolder, ctx, ct);
 
-            // Обновим baseline-коммит, чтобы включить каркас
             if (gitAvailable)
             {
                 var afterScaffold = await GitService.CommitAllAsync(repo, "chore: scaffold via dotnet new", ct);
@@ -78,12 +95,237 @@ namespace Core.Orchestration
                     await Emit(AgentRole.Builder, "git", $"scaffold committed: {afterScaffold}");
                 }
             }
-            // 4) Выполнение этапов
-            await ExecuteStagesAsync(ctx, repo, gitAvailable, ct);
 
-            // 5) Итоговый отчёт
+            RefreshProjectScan(ctx, repo);
+            await ExecuteStagesAsync(ctx, repo, gitAvailable, ct);
+            await RunAgent(AgentRole.Secretary, ctx, ct);
+        }
+
+        /// <summary>
+        /// Повтор только оставшихся/сброшенных этапов (без Architect/Scaffolder).
+        /// </summary>
+        public async Task ResumeStagesAsync(AgentContext ctx, CancellationToken ct)
+        {
+            var repo = ctx.OutputRoot
+                    ?? ctx.ProjectPath
+                    ?? PathHelper.GetProjectOutputRoot(ctx.ProjectId);
+            ctx.OutputRoot = repo;
+            PathHelper.EnsureDirectory(repo);
+
+            if (ctx.Plan is null)
+            {
+                await Emit(AgentRole.Architect, "error", "Нет плана — Resume невозможен.");
+                Events.Writer.TryComplete();
+                return;
+            }
+
+            RefreshProjectScan(ctx, repo);
+            var gitAvailable = await GitService.IsAvailableAsync(ct);
+            await Emit(AgentRole.Builder, "info", "Resume: повтор этапов с Pending.");
+            await ExecuteStagesAsync(ctx, repo, gitAvailable, ct);
             await RunAgent(AgentRole.Secretary, ctx, ct);
             Events.Writer.TryComplete();
+        }
+
+        /// <summary>
+        /// Improve: сканирование → Architect (дельта) → этапы без Scaffolder → Secretary.
+        /// </summary>
+        private async Task RunImproveAsync(AgentContext ctx, string repo, CancellationToken ct)
+        {
+            await Emit(AgentRole.Architect, "info", "Режим Improve: без скаффолдинга, только изменения.");
+            RefreshProjectScan(ctx, repo);
+            ctx.SharedData["project_metrics"] = ProjectMetrics.CollectReport(repo, ctx.Files);
+            await Emit(AgentRole.Architect, "scan",
+                $"Файлов: {ctx.Files.Count}; тип: {ctx.Type}");
+
+            if (ctx.Files.Count == 0)
+            {
+                await Emit(AgentRole.Architect, "warn",
+                    "Исходники не найдены — Improve ожидает существующий проект.");
+            }
+
+            await RunAgent(AgentRole.Architect, ctx, ct);
+            if (ctx.Plan is null)
+            {
+                await Emit(AgentRole.Architect, "error", "План улучшений не сформирован — прекращаем.");
+                return;
+            }
+
+            var gitAvailable = await InitGitBaselineAsync(repo, "chore: baseline before improve", ctx, ct);
+            // Scaffolder пропускается (Mode != CreateNew).
+            await ExecuteStagesAsync(ctx, repo, gitAvailable, ct);
+            await RunAgent(AgentRole.Secretary, ctx, ct);
+        }
+
+        /// <summary>
+        /// FixError: короткий путь ErrorFixer ↔ Builder без Architect/Scaffolder/кодеров.
+        /// </summary>
+        private async Task RunFixErrorAsync(AgentContext ctx, string repo, CancellationToken ct)
+        {
+            await Emit(AgentRole.ErrorFixer, "info",
+                "Режим FixError: Architect и кодеры пропущены.");
+
+            RefreshProjectScan(ctx, repo);
+            await Emit(AgentRole.ErrorFixer, "scan",
+                $"Файлов: {ctx.Files.Count}; тип: {ctx.Type}");
+
+            // Описание ошибки от пользователя — стартовый контекст для Fixer.
+            ctx.SharedData["build_log"] =
+                "=== USER ERROR REPORT ===\n" + ctx.UserPrompt + "\n";
+
+            var gitAvailable = await InitGitBaselineAsync(repo, "fix: baseline before error fix", ctx, ct);
+
+            // Сначала пробуем собрать — получим реальный лог.
+            await RunAgent(AgentRole.Builder, ctx, ct);
+
+            bool ok = ctx.SharedData.GetValueOrDefault("build_ok") == "true";
+            if (!ok)
+            {
+                // Классический цикл исправлений по логу сборки.
+                ok = await ContinueFixLoopAsync(ctx, maxAttempts: 5, ct);
+            }
+            else
+            {
+                // Сборка зелёная, но пользователь описал runtime/логическую ошибку —
+                // даём Fixer один (или несколько) проходов по описанию.
+                await Emit(AgentRole.ErrorFixer, "info",
+                    "Сборка успешна — исправляем по описанию пользователя.");
+                for (int i = 0; i < 3; i++)
+                {
+                    ctx.SharedData.Remove("fix_code");
+                    // Сохраняем user report + последний build log.
+                    var log = ctx.SharedData.GetValueOrDefault("build_log", "");
+                    if (!log.Contains("USER ERROR REPORT", StringComparison.Ordinal))
+                    {
+                        ctx.SharedData["build_log"] =
+                            "=== USER ERROR REPORT ===\n" + ctx.UserPrompt + "\n\n" + log;
+                    }
+
+                    await RunAgent(AgentRole.ErrorFixer, ctx, ct);
+                    var fixedAny = !string.IsNullOrWhiteSpace(
+                        ctx.SharedData.GetValueOrDefault("last_fixed_files", ""));
+                    await RunAgent(AgentRole.Builder, ctx, ct);
+                    ok = ctx.SharedData.GetValueOrDefault("build_ok") == "true";
+                    if (!fixedAny) break;
+                    if (!ok)
+                    {
+                        ok = await ContinueFixLoopAsync(ctx, maxAttempts: 3, ct);
+                        break;
+                    }
+                }
+            }
+
+            if (gitAvailable)
+            {
+                var msg = ok ? "fix: error fix applied" : "fix: error fix attempted (build still failing)";
+                var sha = await GitService.CommitAllAsync(repo, msg, ct);
+                if (!string.IsNullOrEmpty(sha))
+                    await Emit(AgentRole.Builder, "git", $"fix committed: {sha}");
+            }
+
+            await Emit(AgentRole.ErrorFixer, ok ? "done" : "warn",
+                ok ? "Сборка успешна после исправлений." : "Сборка всё ещё падает — см. build_log.");
+            await RunAgent(AgentRole.Secretary, ctx, ct);
+        }
+
+        private async Task<bool> ContinueFixLoopAsync(AgentContext ctx, int maxAttempts, CancellationToken ct)
+        {
+            int attempt = 0;
+            while (ctx.SharedData.GetValueOrDefault("build_ok") == "false" && attempt++ < maxAttempts)
+            {
+                ctx.SharedData.Remove("fix_code");
+                await RunAgent(AgentRole.ErrorFixer, ctx, ct);
+                await RunAgent(AgentRole.Builder, ctx, ct);
+            }
+            return ctx.SharedData.GetValueOrDefault("build_ok") == "true";
+        }
+
+        /// <summary>
+        /// Analyze: метрики + Analyst → ANALYSIS.md, без изменения кода и сборки.
+        /// </summary>
+        private async Task RunAnalyzeAsync(AgentContext ctx, string repo, CancellationToken ct)
+        {
+            await Emit(AgentRole.Analyst, "info", "Режим Analyze: код не изменяется, сборка не запускается.");
+            RefreshProjectScan(ctx, repo);
+            ctx.SharedData["project_metrics"] = ProjectMetrics.CollectReport(repo, ctx.Files);
+            await Emit(AgentRole.Analyst, "scan",
+                $"Файлов: {ctx.Files.Count}; тип: {ctx.Type}");
+
+            await RunAgent(AgentRole.Analyst, ctx, ct);
+            await RunAgent(AgentRole.Secretary, ctx, ct);
+        }
+
+        private async Task<bool> InitGitBaselineAsync(
+            string repo, string message, AgentContext ctx, CancellationToken ct)
+        {
+            var gitAvailable = await GitService.IsAvailableAsync(ct);
+            if (!gitAvailable)
+            {
+                await Emit(AgentRole.Builder, "warn", "git не установлен — работаем без версионирования.");
+                return false;
+            }
+
+            await GitService.InitIfNeededAsync(repo, ct);
+            var baseline = await GitService.CommitAllAsync(repo, message, ct);
+            ctx.SharedData["baseline_sha"] = baseline ?? "";
+            await Emit(AgentRole.Builder, "git", $"baseline: {baseline}");
+            return true;
+        }
+
+        /// <summary>
+        /// Document: сканирование → Documenter → (git) → Secretary.
+        /// Без Architect-этапов, Scaffolder, кодеров, Builder и ErrorFixer.
+        /// </summary>
+        private async Task RunDocumentationAsync(AgentContext ctx, string repo, CancellationToken ct)
+        {
+            await Emit(AgentRole.Documenter, "info", "Режим документирования: кодеры и сборка пропущены.");
+
+            RefreshProjectScan(ctx, repo);
+            await Emit(AgentRole.Documenter, "scan",
+                $"Файлов: {ctx.Files.Count}; тип: {ctx.Type}");
+
+            if (ctx.Files.Count == 0)
+            {
+                await Emit(AgentRole.Documenter, "warn",
+                    "В указанной папке не найдено исходников — Documenter всё равно попробует описать пустой проект.");
+            }
+
+            var gitAvailable = await GitService.IsAvailableAsync(ct);
+            if (gitAvailable)
+            {
+                await GitService.InitIfNeededAsync(repo, ct);
+                var baseline = await GitService.CommitAllAsync(repo, "docs: baseline before documentation", ct);
+                ctx.SharedData["baseline_sha"] = baseline ?? "";
+                await Emit(AgentRole.Builder, "git", $"docs baseline: {baseline}");
+            }
+
+            await RunAgent(AgentRole.Documenter, ctx, ct);
+
+            if (gitAvailable)
+            {
+                var sha = await GitService.CommitAllAsync(repo, "docs: generated project documentation", ct);
+                if (!string.IsNullOrEmpty(sha))
+                    await Emit(AgentRole.Builder, "git", $"docs committed: {sha}");
+            }
+
+            await RunAgent(AgentRole.Secretary, ctx, ct);
+        }
+
+        private static void RefreshProjectScan(AgentContext ctx, string repo)
+        {
+            if (!Directory.Exists(repo)) return;
+
+            var scan = ProjectScanner.ScanDetailed(repo);
+            ctx.Files.Clear();
+            ctx.Files.AddRange(scan.Files);
+            ctx.SharedData["project_structure"] = scan.StructureTree;
+            ctx.SharedData["project_previews"] = ProjectScanner.BuildFilePreviews(repo, scan.Files);
+
+            if (ctx.Type == ProjectType.Unknown
+                && Enum.TryParse<ProjectType>(scan.Type, out var pt))
+            {
+                ctx.Type = pt;
+            }
         }
 
         // -------------------- ЭТАПЫ --------------------
@@ -103,6 +345,9 @@ namespace Core.Orchestration
                 ctx.CurrentStage = next;
                 await Emit(AgentRole.Architect, "stage-start", $"{next.Id}. {next.Name}");
 
+                // Актуальные файлы для релевантного контекста кодеров.
+                RefreshProjectScan(ctx, repo);
+
                 // Очищаем накопления предыдущего этапа
                 foreach (var k in new[] { "backend_code", "frontend_code", "game_code", "tests_code", "fix_code", "fullstack_code" })
                     ctx.SharedData.Remove(k);
@@ -120,6 +365,15 @@ namespace Core.Orchestration
                 bool wantsBackend = next.Scope.Contains("Backend");
                 bool wantsFrontend = next.Scope.Contains("Frontend");
 
+                bool wantsDocs = next.Scope.Contains("Docs", StringComparer.OrdinalIgnoreCase);
+                bool wantsCode = wantsBackend || wantsFrontend
+                    || next.Scope.Contains("Game", StringComparer.OrdinalIgnoreCase)
+                    || next.Scope.Contains("Tests", StringComparer.OrdinalIgnoreCase);
+
+                // Документация этапа — без кодеров и сборки.
+                if (wantsDocs)
+                    await RunAgent(AgentRole.Documenter, ctx, ct);
+
                 if (coderMode == CoderMode.Unified && (wantsBackend || wantsFrontend))
                 {
                     // Один агент делает всё за один заход.
@@ -132,16 +386,45 @@ namespace Core.Orchestration
                     if (wantsFrontend) await RunAgent(AgentRole.FrontendCoder, ctx, ct);
                 }
 
-                if (next.Scope.Contains("Game"))
+                if (next.Scope.Contains("Game", StringComparer.OrdinalIgnoreCase))
+                {
+                    // Сначала художник генерирует спрайты, затем кодер их подключает.
+                    await RunAgent(AgentRole.Artist, ctx, ct);
                     await RunAgent(AgentRole.GameCoder, ctx, ct);
+                }
 
-
-
-                if (next.Scope.Contains("Tests"))
+                if (next.Scope.Contains("Tests", StringComparer.OrdinalIgnoreCase))
                     await RunAgent(AgentRole.Tester, ctx, ct);
 
-                // Сборка + до 3 попыток авто-исправления
-                var buildOk = await BuildWithFixesAsync(ctx, maxAttempts: 3, ct);
+                bool buildOk;
+                if (wantsDocs && !wantsCode)
+                {
+                    // Только Docs — сборка не нужна.
+                    ctx.SharedData["build_ok"] = "true";
+                    buildOk = true;
+                    await Emit(AgentRole.Documenter, "stage-docs", $"{next.Id}: документация без сборки");
+                }
+                else
+                {
+                    // Сборка + до 3 попыток авто-исправления
+                    buildOk = await BuildWithFixesAsync(ctx, maxAttempts: 3, ct);
+                }
+
+                // Чеклист приёмки: test + MonoGame smoke.
+                if (buildOk && !(wantsDocs && !wantsCode))
+                {
+                    var acceptance = await StageAcceptance.RunAsync(ctx, next, repo, ct);
+                    await Emit(AgentRole.Builder,
+                        acceptance.Ok ? "acceptance-ok" : "acceptance-fail",
+                        acceptance.Summary);
+                    if (!acceptance.Ok)
+                    {
+                        buildOk = false;
+                        ctx.SharedData["build_ok"] = "false";
+                        var prev = ctx.SharedData.GetValueOrDefault("build_log", "");
+                        ctx.SharedData["build_log"] = prev + "\n" + acceptance.Log;
+                    }
+                }
 
                 if (buildOk)
                 {

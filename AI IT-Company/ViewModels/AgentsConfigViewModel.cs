@@ -75,6 +75,11 @@ public partial class AgentConfigItem : ObservableObject
         AgentRole.Builder => "🔧 Сборщик (DevOps)",
         AgentRole.ErrorFixer => "🩹 Исправитель ошибок",
         AgentRole.Secretary => "📝 Секретарь",
+        AgentRole.Scaffolder => "🏗 Скаффолдер",
+        AgentRole.Translator => "🌐 Переводчик",
+        AgentRole.Documenter => "📚 Документатор",
+        AgentRole.Artist => "🎨 Художник (спрайты)",
+        AgentRole.Analyst => "🔍 Аналитик",
         _ => r.ToString()
     };
 }
@@ -135,5 +140,21 @@ public partial class AgentsConfigViewModel : ObservableObject
             saved++;
         }
         GlobalStatus = $"✅ Сохранено агентов: {saved}";
+    }
+
+    [RelayCommand]
+    private async Task ApplyCompactPresetAsync()
+    {
+        await _store.ApplyPresetAsync("compact");
+        Reload();
+        GlobalStatus = "✅ Пресет Compact (7b / лёгкие модели) применён";
+    }
+
+    [RelayCommand]
+    private async Task ApplyBalancedPresetAsync()
+    {
+        await _store.ApplyPresetAsync("balanced");
+        Reload();
+        GlobalStatus = "✅ Пресет Balanced (14b на ключевых ролях) применён";
     }
 }

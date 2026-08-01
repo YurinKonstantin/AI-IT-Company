@@ -1,9 +1,6 @@
-﻿
-using Core.Agents;
-using Core.Configuration;
+﻿using Core.Configuration;
 using Core.Contracts;
 using Microsoft.Extensions.Logging;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -13,7 +10,7 @@ namespace Core.Agents;
 
 /// <summary>
 /// Кодер-геймдев для Monogame (DesktopGL).
-/// Генерирует Game1.cs, Player/Enemy/Level, csproj с зависимостями.
+/// Генерирует Game1.cs, Player/Enemy/Level; текстуры берёт из манифеста Artist.
 /// </summary>
 public sealed class GameCoderAgent : AgentBase
 {
@@ -28,10 +25,16 @@ public sealed class GameCoderAgent : AgentBase
     2. Separate entities into files: Player.cs, Enemy.cs, Coin.cs, Level.cs, Sprite.cs.
     3. Use Vector2 for positions/velocities, Rectangle for collisions (AABB).
     4. Input: Keyboard.GetState() — WASD and Space by default.
-    5. Content: use test stub textures via
-       new Texture2D(GraphicsDevice, w, h) + SetData<Color>() — WITHOUT .xnb files,
-       so the project builds without MGCB editor.
-    6. Required .csproj with PackageReference to MonoGame.Framework.DesktopGL.
+    5. TEXTURES — REQUIRED when an asset manifest is provided in the user prompt:
+       - Load PNG files with Texture2D.FromStream(GraphicsDevice, stream).
+       - Prefer TitleContainer.OpenStream("Content/Sprites/....png") or File.OpenRead
+         with paths from the manifest (relative to the output directory).
+       - Do NOT use colored Texture2D stubs when real PNG paths are listed.
+       - Do NOT require .xnb / MGCB editor.
+       - Fallback ONLY if the manifest is missing: Texture2D + SetData<Color>().
+    6. Ensure Content files are copied to output (csproj None Update Content\**\* CopyToOutputDirectory).
+       Prefer a small xml:diff on .csproj rather than rewriting the whole file.
+    7. PackageReference to MonoGame.Framework.DesktopGL via xml:diff if missing.
 
     RESPONSE FORMAT:
     Only code blocks with paths:
@@ -41,8 +44,8 @@ public sealed class GameCoderAgent : AgentBase
         ```csharp:Entities/Player.cs
         ...
         ```
-        ```xml:MyGame.csproj
-        <Project Sdk="Microsoft.NET.Sdk">...</Project>
+        ```xml:diff:MyGame.csproj
+        + <None Update="Content\**\*"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
         ```
         No text outside blocks.
     """;
@@ -51,7 +54,8 @@ public sealed class GameCoderAgent : AgentBase
                           ILogger<GameCoderAgent> logger)
         : base(factory, configStore, promptStore, logger) { }
 
-    protected override string BuildUserPrompt(AgentContext ctx) => StageContextBuilder.Build(ctx, coderRole: "Кодер-Геймдев (MonoGame.Framework.DesktopGL)");
+    protected override string BuildUserPrompt(AgentContext ctx)
+        => StageContextBuilder.Build(ctx, coderRole: "Кодер-Геймдев (MonoGame.Framework.DesktopGL)");
 
     protected override Task<AgentResult> PostProcessAsync(AgentContext ctx, string output, CancellationToken ct)
     {

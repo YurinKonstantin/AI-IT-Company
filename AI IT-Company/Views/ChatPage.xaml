@@ -20,17 +20,18 @@
         <!-- Режим -->
         <ComboBox Grid.Row="1"
                   Header="Режим работы"
-                  MinWidth="280"
+                  MinWidth="320"
                   SelectedIndex="{x:Bind ViewModel.ModeIndex, Mode=TwoWay}">
             <x:String>Создать новый</x:String>
             <x:String>Улучшить существующий</x:String>
             <x:String>Исправить ошибку</x:String>
             <x:String>Задокументировать</x:String>
+            <x:String>Проанализировать</x:String>
         </ComboBox>
 
         <!-- Путь к проекту -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
-            <TextBox PlaceholderText="Путь к существующему проекту (для режимов 2–4)"
+            <TextBox PlaceholderText="Путь к существующему проекту (Improve / Fix / Document / Analyze)"
                      Width="520"
                      Text="{x:Bind ViewModel.ProjectPath, Mode=TwoWay}"/>
             <Button Content="📁 Обзор..." Command="{x:Bind ViewModel.PickFolderCommand}"/>
@@ -74,16 +75,25 @@
                   IsOpen="{x:Bind ViewModel.Runner.HasActiveProject, Mode=OneWay}"
                   IsClosable="False" Severity="Success" Title="Проект">
                 <muxc:InfoBar.Content>
-                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4">
-                        <TextBlock Text="ID:" Opacity="0.7"/>
-                        <TextBlock Text="{x:Bind ViewModel.Runner.CurrentProjectId, Mode=OneWay}"
-                           FontFamily="Consolas" FontWeight="SemiBold"/>
-                        <Button Content="📋" ToolTipService.ToolTip="Скопировать ID"
-                        Command="{x:Bind ViewModel.CopyProjectIdCommand}" Padding="6,2"/>
-                        <TextBlock Text="→" Opacity="0.5"/>
-                        <TextBlock Text="{x:Bind ViewModel.Runner.CurrentOutputRoot, Mode=OneWay}"
-                           FontFamily="Consolas" Opacity="0.85"
-                           TextTrimming="CharacterEllipsis" MaxWidth="360"/>
+                    <StackPanel Spacing="4" Margin="0,4">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="ID:" Opacity="0.7"/>
+                            <TextBlock Text="{x:Bind ViewModel.Runner.CurrentProjectId, Mode=OneWay}"
+                               FontFamily="Consolas" FontWeight="SemiBold"/>
+                            <Button Content="📋" ToolTipService.ToolTip="Скопировать ID"
+                            Command="{x:Bind ViewModel.CopyProjectIdCommand}" Padding="6,2"/>
+                            <TextBlock Text="→" Opacity="0.5"/>
+                            <TextBlock Text="{x:Bind ViewModel.Runner.CurrentOutputRoot, Mode=OneWay}"
+                               FontFamily="Consolas" Opacity="0.85"
+                               TextTrimming="CharacterEllipsis" MaxWidth="280"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{x:Bind ViewModel.Runner.StatusText, Mode=OneWay}"
+                                       Opacity="0.9" TextWrapping="Wrap"/>
+                            <Button Content="🔁 Повторить этап"
+                                    Command="{x:Bind ViewModel.RetryFailedStageCommand}"
+                                    IsEnabled="{x:Bind ViewModel.Runner.CanRetryLastFailedStage, Mode=OneWay}"/>
+                        </StackPanel>
                     </StackPanel>
                 </muxc:InfoBar.Content>
                 <muxc:InfoBar.ActionButton>

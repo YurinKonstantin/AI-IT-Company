@@ -38,7 +38,9 @@ public sealed class ErrorFixerAgent : AgentBase
            ```csharp:Path/To/File.cs
            // full file entirely
            ```
-        5. If a NuGet package needs to be added — output the updated .csproj completely.
+        5. Prefer fixing CODE. The Builder already auto-runs `dotnet restore` and
+           `dotnet add package` for missing NuGet packages (NU1101/CS0246 mappings).
+           Only rewrite .csproj if the package reference itself is wrong/corrupt.
         6. Do not invent APIs that do not exist. If in doubt, use a proven approach.
         7. Preserve existing logic; change the minimum required to fix the issue.
 
@@ -70,6 +72,27 @@ public sealed class ErrorFixerAgent : AgentBase
  {stage.Id}. {stage.Name}
  Deliverables: {string.Join("; ", stage.Deliverables)}
  """;
+
+        if (ctx.Mode == WorkMode.FixError)
+        {
+            return $"""
+ Attempt #{int.Parse(attempt) + 1}. Mode: FixError (standalone — no stage plan).
+ Fix the issue described by the user and/or the build log. Change the minimum set of files.
+
+ === User request ===
+ {ctx.UserPrompt}
+
+ === Build / error log (last 8000 chars) ===
+ {TruncateTail(buildLog, 8000)}
+
+ === Existing project code ===
+ {BuildCodeContext(ctx)}
+
+ Return:
+ 1) ```analysis``` block — brief diagnosis;
+ 2) COMPLETE versions of files that need to be rewritten.
+ """;
+        }
 
         return $"""
  Attempt #{int.Parse(attempt) + 1}. Task: return code to a compilable state within the CURRENT STAGE.

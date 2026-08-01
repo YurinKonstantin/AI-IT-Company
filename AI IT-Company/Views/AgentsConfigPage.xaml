@@ -15,6 +15,12 @@
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
             <Button Content="💾 Сохранить все изменения"
               Command="{x:Bind ViewModel.SaveAllCommand}"/>
+            <Button Content="📦 Пресет Compact (7b)"
+              Command="{x:Bind ViewModel.ApplyCompactPresetCommand}"
+              ToolTipService.ToolTip="Модели для ПК 8–16 GB (README)"/>
+            <Button Content="📦 Пресет Balanced (14b)"
+              Command="{x:Bind ViewModel.ApplyBalancedPresetCommand}"
+              ToolTipService.ToolTip="Модели для ПК 16–24 GB (README)"/>
             <TextBlock Text="{x:Bind ViewModel.GlobalStatus, Mode=OneWay}"
                  VerticalAlignment="Center" Opacity="0.75"/>
         </StackPanel>

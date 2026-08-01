@@ -129,6 +129,39 @@
                 </StackPanel>
             </Border>
 
+            <!-- ============= ARTIST IMAGE-GEN ============= -->
+            <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Художник — генерация спрайтов" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                               Text="По умолчанию — локальный процедурный pixel-art (без API). OpenRouter и Ollama опциональны; при ошибке image-gen Artist автоматически откатывается на procedural."/>
+
+                    <ComboBox Header="Источник изображений"
+                              MinWidth="480"
+                              ItemsSource="{x:Bind ViewModel.ArtistImageModeOptions}"
+                              SelectedIndex="{x:Bind ViewModel.ArtistImageModeIndex, Mode=TwoWay}"/>
+
+                    <TextBox Header="Модель OpenRouter (image)"
+                             Width="480" HorizontalAlignment="Left"
+                             PlaceholderText="google/gemini-2.5-flash-image-preview"
+                             Text="{x:Bind ViewModel.ArtistOpenRouterImageModel, Mode=TwoWay}"/>
+
+                    <TextBox Header="Модель Ollama (image-capable)"
+                             Width="480" HorizontalAlignment="Left"
+                             PlaceholderText="имя модели из ollama list"
+                             Text="{x:Bind ViewModel.ArtistOllamaImageModel, Mode=TwoWay}"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="💾 Сохранить"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Command="{x:Bind ViewModel.SaveArtistImageCommand}"/>
+                        <TextBlock Text="{x:Bind ViewModel.ArtistImageStatus, Mode=OneWay}"
+                                   VerticalAlignment="Center" Opacity="0.75"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <!-- ============= TEMPLATES ============= -->
             <Border BorderThickness="1" CornerRadius="8" Padding="16"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">

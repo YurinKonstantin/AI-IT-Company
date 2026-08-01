@@ -18,13 +18,21 @@ public sealed class InterpreterAgent : AgentBase
      "type":"WinUI|Api|Console|MonogameGame",
      "summary":"..."}
     No other text.
-""";
+    If the user already selected a work mode in the UI, still return your best-guess mode
+    in the JSON — the orchestrator may ignore it and keep the UI choice.
+    """;
 
     public InterpreterAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
                         ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore, logger) { }
 
     protected override string BuildUserPrompt(AgentContext ctx)
-        => $"User prompt: {ctx.UserPrompt}\nProject path: {ctx.ProjectPath ?? "нет"}";
+        => $"""
+            User prompt: {ctx.UserPrompt}
+            Project path: {ctx.ProjectPath ?? "нет"}
+            UI-selected mode (authoritative if locked): {ctx.Mode}
+            ModeLocked: {ctx.ModeLocked}
+            Already detected type: {ctx.Type}
+            """;
 
     protected override Task<AgentResult> PostProcessAsync(AgentContext ctx, string output, CancellationToken ct)
     {
@@ -33,8 +41,21 @@ public sealed class InterpreterAgent : AgentBase
             var json = ExtractJson(output);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
-            ctx.Mode = Enum.Parse<WorkMode>(root.GetProperty("mode").GetString()!);
-            ctx.Type = Enum.Parse<ProjectType>(root.GetProperty("type").GetString()!);
+
+            var suggestedMode = Enum.Parse<WorkMode>(root.GetProperty("mode").GetString()!);
+            var suggestedType = Enum.Parse<ProjectType>(root.GetProperty("type").GetString()!);
+
+            ctx.SharedData["interpreter_suggested_mode"] = suggestedMode.ToString();
+            ctx.SharedData["interpreter_suggested_type"] = suggestedType.ToString();
+
+            // Режим из UI имеет приоритет.
+            if (!ctx.ModeLocked)
+                ctx.Mode = suggestedMode;
+
+            // Тип из сканера проекта важнее догадки модели.
+            if (ctx.Type == ProjectType.Unknown)
+                ctx.Type = suggestedType;
+
             ctx.SharedData["summary"] = root.GetProperty("summary").GetString() ?? "";
             return Task.FromResult(new AgentResult(true, json));
         }
