@@ -1,7 +1,6 @@
 ﻿using Core.Models;
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace Core.Contracts
 {
@@ -24,7 +23,14 @@ namespace Core.Contracts
 
         public Dictionary<string, string> SharedData { get; } = new();
         public List<string> Files { get; } = new();
+
+        /// <summary>Явные вложения пользователя (@file / @folder).</summary>
+        public List<ContextAttachment> Attachments { get; } = new();
+
         public ProjectPlan? Plan { get; set; }
         public Stage? CurrentStage { get; set; }
+
+        /// <summary>Обратный вызов для терминала/pending в ленту пайплайна.</summary>
+        public Action<AgentRole, string, string>? RaiseEvent { get; set; }
     }
 }

@@ -182,6 +182,7 @@ public sealed class AgentConfigStore
         AgentRole.Documenter => S("llama3.2:3b", 0.35),
         AgentRole.Artist => S("qwen2.5-coder:7b", 0.45),
         AgentRole.Analyst => S("llama3.2:3b", 0.35),
+        AgentRole.UxReviewer => S("llama3.2:3b", 0.35),
         _ => S("qwen2.5-coder:7b", 0.2)
     };
 
@@ -203,6 +204,7 @@ public sealed class AgentConfigStore
         AgentRole.Documenter => S("llama3.1:8b", 0.35),
         AgentRole.Artist => S("qwen2.5-coder:14b", 0.45),
         AgentRole.Analyst => S("llama3.1:8b", 0.35),
+        AgentRole.UxReviewer => S("llama3.1:8b", 0.35),
         _ => S("qwen2.5-coder:14b", 0.2)
     };
 

@@ -21,6 +21,7 @@ namespace AI_IT_Company.ViewModels
         private readonly OllamaClient _client;
         private readonly OllamaProvider _ollamaProvider;
         private readonly OpenRouterProvider _openRouterProvider;
+        private readonly LmStudioProvider _lmStudioProvider;
         private readonly OnnxProvider _onnxProvider;
         private readonly WindowsCredentialStore _credentials;
         private readonly AgentPromptStore _promptStore;
@@ -32,7 +33,7 @@ namespace AI_IT_Company.ViewModels
             "🧑‍💻 Один универсальный Fullstack-кодер"
         };
 
-        public string[] AiProviderOptions { get; } = { "Ollama", "OpenRouter", "ONNX" };
+        public string[] AiProviderOptions { get; } = { "Ollama", "OpenRouter", "LM Studio", "ONNX" };
 
         [ObservableProperty] private bool translationEnabled = true;
         [ObservableProperty] private string userLanguage = "Russian";
@@ -88,6 +89,11 @@ namespace AI_IT_Company.ViewModels
         [ObservableProperty] private string openRouterStatus = "";
         [ObservableProperty] private bool isOpenRouterOk;
 
+        // --- LM Studio ---
+        [ObservableProperty] private string lmStudioUrl = "";
+        [ObservableProperty] private string lmStudioStatus = "";
+        [ObservableProperty] private bool isLmStudioOk;
+
         // --- ONNX ---
         [ObservableProperty] private string onnxModelsPath = "";
         [ObservableProperty] private string onnxStatus = "";
@@ -102,11 +108,45 @@ namespace AI_IT_Company.ViewModels
         // --- Промпты ---
         public ObservableCollection<PromptItem> Prompts { get; } = new();
 
+        // --- Cursor-like: review + editor ---
+        public string[] ReviewChangesModeOptions { get; } =
+        {
+            "ImproveFix — ревью только Improve/Fix",
+            "Always — всегда ждать Apply",
+            "Never — авто-применение"
+        };
+
+        [ObservableProperty] private int reviewChangesModeIndex;
+        [ObservableProperty] private string reviewChangesStatus = "";
+        [ObservableProperty] private string externalEditorPath = "";
+        [ObservableProperty] private string externalEditorArgs = "";
+        [ObservableProperty] private string externalEditorStatus = "";
+
+        // --- Freelance ---
+        [ObservableProperty] private string freelanceSkills = "";
+        [ObservableProperty] private string freelanceHourlyRate = "30";
+        [ObservableProperty] private string freelanceKeywords = "";
+        [ObservableProperty] private string freelanceGitHubQuery = "";
+        [ObservableProperty] private bool freelanceEnableDemo = true;
+        [ObservableProperty] private bool freelanceEnableGitHub = true;
+        [ObservableProperty] private bool freelanceEnableFlRu;
+        [ObservableProperty] private bool freelanceEnableKwork;
+        [ObservableProperty] private bool freelanceAutoAccept;
+        [ObservableProperty] private bool freelanceSimulationOnly;
+        [ObservableProperty] private string freelanceAutoAcceptThreshold = "75";
+        [ObservableProperty] private string freelanceMinProfit = "50";
+        [ObservableProperty] private string freelanceFlRuFeedUrl = "";
+        [ObservableProperty] private string freelanceKworkFeedUrl = "";
+        [ObservableProperty] private string gitHubPatInput = "";
+        [ObservableProperty] private bool hasGitHubPat;
+        [ObservableProperty] private string freelanceStatus = "";
+
         public SettingsViewModel(
             AppSettingsStore settings,
             OllamaClient client,
             OllamaProvider ollamaProvider,
             OpenRouterProvider openRouterProvider,
+            LmStudioProvider lmStudioProvider,
             OnnxProvider onnxProvider,
             WindowsCredentialStore credentials,
             AgentPromptStore promptStore)
@@ -115,6 +155,7 @@ namespace AI_IT_Company.ViewModels
             _client = client;
             _ollamaProvider = ollamaProvider;
             _openRouterProvider = openRouterProvider;
+            _lmStudioProvider = lmStudioProvider;
             _onnxProvider = onnxProvider;
             _credentials = credentials;
             _promptStore = promptStore;
@@ -123,6 +164,7 @@ namespace AI_IT_Company.ViewModels
 
             OllamaUrl = _settings.Get(AppSettingsStore.KeyOllamaUrl, AppSettingsStore.KeyOllamaDefaultUrl);
             OpenRouterBaseUrl = _settings.GetOpenRouterBaseUrl();
+            LmStudioUrl = _settings.GetLmStudioUrl();
             OnnxModelsPath = _settings.GetOnnxModelsPath();
             DefaultAiProvider = _settings.GetDefaultAiProvider();
             HasOpenRouterApiKey = _credentials.HasSecret(WindowsCredentialStore.OpenRouterResource);
@@ -140,13 +182,97 @@ namespace AI_IT_Company.ViewModels
             TranslationEnabled = _settings.GetTranslationEnabled();
             UserLanguage = _settings.GetUserLanguage();
             WorkingLanguage = _settings.GetWorkingLanguage();
+            ReviewChangesModeIndex = _settings.GetReviewChangesMode().Trim().ToLowerInvariant() switch
+            {
+                "always" => 1,
+                "never" or "off" => 2,
+                _ => 0
+            };
+            ExternalEditorPath = _settings.GetExternalEditorPath();
+            ExternalEditorArgs = _settings.GetExternalEditorArgs();
+            FreelanceSkills = _settings.Get(AppSettingsStore.KeyFreelanceSkills, AppSettingsStore.KeyFreelanceSkillsDefault);
+            FreelanceHourlyRate = _settings.Get(AppSettingsStore.KeyFreelanceHourlyRate, AppSettingsStore.KeyFreelanceHourlyRateDefault);
+            FreelanceKeywords = _settings.Get(AppSettingsStore.KeyFreelanceKeywords, AppSettingsStore.KeyFreelanceKeywordsDefault);
+            FreelanceGitHubQuery = _settings.Get(AppSettingsStore.KeyFreelanceGitHubQuery, AppSettingsStore.KeyFreelanceGitHubQueryDefault);
+            FreelanceEnableDemo = bool.TryParse(_settings.Get(AppSettingsStore.KeyFreelanceEnableDemo, "true"), out var d) && d;
+            FreelanceEnableGitHub = bool.TryParse(_settings.Get(AppSettingsStore.KeyFreelanceEnableGitHub, "true"), out var g) && g;
+            FreelanceEnableFlRu = bool.TryParse(_settings.Get(AppSettingsStore.KeyFreelanceEnableFlRu, "false"), out var f) && f;
+            FreelanceEnableKwork = bool.TryParse(_settings.Get(AppSettingsStore.KeyFreelanceEnableKwork, "false"), out var k) && k;
+            FreelanceAutoAccept = bool.TryParse(_settings.Get(AppSettingsStore.KeyFreelanceAutoAccept, "false"), out var a) && a;
+            FreelanceSimulationOnly = bool.TryParse(_settings.Get(AppSettingsStore.KeyFreelanceSimulationOnly, "false"), out var sim) && sim;
+            FreelanceAutoAcceptThreshold = _settings.Get(AppSettingsStore.KeyFreelanceAutoAcceptThreshold, AppSettingsStore.KeyFreelanceAutoAcceptThresholdDefault);
+            FreelanceMinProfit = _settings.Get(AppSettingsStore.KeyFreelanceMinProfit, AppSettingsStore.KeyFreelanceMinProfitDefault);
+            FreelanceFlRuFeedUrl = _settings.Get(Ai.Freelance.FlRuMarketplaceAdapter.FeedUrlKey, "");
+            FreelanceKworkFeedUrl = _settings.Get(Ai.Freelance.KworkMarketplaceAdapter.FeedUrlKey, "");
+            HasGitHubPat = _credentials.HasSecret(WindowsCredentialStore.GitHubPatResource);
             LoadTemplates();
             LoadPrompts();
             RefreshOnnxFolderList();
             _ = RefreshTemplatesAsync();
             _ = CheckOllamaAsync();
             _ = CheckOpenRouterAsync();
+            _ = CheckLmStudioAsync();
             _ = CheckOnnxAsync();
+        }
+
+        [RelayCommand]
+        private async Task SaveFreelanceAsync()
+        {
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceSkills, FreelanceSkills ?? "");
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceHourlyRate, FreelanceHourlyRate ?? "30");
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceKeywords, FreelanceKeywords ?? "");
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceGitHubQuery, FreelanceGitHubQuery ?? "");
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceEnableDemo, FreelanceEnableDemo.ToString());
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceEnableGitHub, FreelanceEnableGitHub.ToString());
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceEnableFlRu, FreelanceEnableFlRu.ToString());
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceEnableKwork, FreelanceEnableKwork.ToString());
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceAutoAccept, FreelanceAutoAccept.ToString());
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceSimulationOnly, FreelanceSimulationOnly.ToString());
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceAutoAcceptThreshold, FreelanceAutoAcceptThreshold ?? "75");
+            await _settings.SetAsync(AppSettingsStore.KeyFreelanceMinProfit, FreelanceMinProfit ?? "50");
+            await _settings.SetAsync(Ai.Freelance.FlRuMarketplaceAdapter.FeedUrlKey, FreelanceFlRuFeedUrl ?? "");
+            await _settings.SetAsync(Ai.Freelance.KworkMarketplaceAdapter.FeedUrlKey, FreelanceKworkFeedUrl ?? "");
+
+            if (!string.IsNullOrWhiteSpace(GitHubPatInput))
+            {
+                _credentials.SetSecret(WindowsCredentialStore.GitHubPatResource, GitHubPatInput.Trim());
+                GitHubPatInput = "";
+                HasGitHubPat = true;
+            }
+
+            FreelanceStatus = "💾 Настройки биржи сохранены"
+                + (HasGitHubPat ? " · GitHub PAT есть" : " · GitHub без PAT (лимит API ниже)");
+        }
+
+        [RelayCommand]
+        private void ClearGitHubPat()
+        {
+            _credentials.RemoveSecret(WindowsCredentialStore.GitHubPatResource);
+            HasGitHubPat = false;
+            FreelanceStatus = "GitHub PAT удалён";
+        }
+
+        [RelayCommand]
+        private async Task SaveReviewChangesAsync()
+        {
+            var mode = ReviewChangesModeIndex switch
+            {
+                1 => "Always",
+                2 => "Never",
+                _ => "ImproveFix"
+            };
+            await _settings.SetReviewChangesModeAsync(mode);
+            ReviewChangesStatus = $"💾 Ревью изменений: {mode}";
+        }
+
+        [RelayCommand]
+        private async Task SaveExternalEditorAsync()
+        {
+            await _settings.SetExternalEditorPathAsync((ExternalEditorPath ?? "").Trim());
+            await _settings.SetExternalEditorArgsAsync((ExternalEditorArgs ?? "").Trim());
+            ExternalEditorStatus = string.IsNullOrWhiteSpace(ExternalEditorPath)
+                ? "💾 Редактор не задан — будет explorer /select"
+                : $"💾 Редактор: {ExternalEditorPath}";
         }
 
         [RelayCommand]
@@ -209,6 +335,31 @@ namespace AI_IT_Company.ViewModels
             OllamaStatus = IsOllamaOk
                 ? $"✅ Соединение с {_ollamaProvider.BaseUrl} работает."
                 : $"❌ Не удалось подключиться к {_ollamaProvider.BaseUrl}.";
+        }
+
+        // ---------- LM STUDIO ----------
+        [RelayCommand]
+        private async Task SaveLmStudioAsync()
+        {
+            var url = (LmStudioUrl ?? "").Trim().TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out _))
+            {
+                LmStudioStatus = "❌ Некорректный URL";
+                return;
+            }
+            await _settings.SetLmStudioUrlAsync(url);
+            _lmStudioProvider.SetBaseUrl(url);
+            LmStudioStatus = "💾 Сохранено, проверяем…";
+            await CheckLmStudioAsync();
+        }
+
+        [RelayCommand]
+        private async Task CheckLmStudioAsync()
+        {
+            IsLmStudioOk = await _lmStudioProvider.IsAvailableAsync();
+            LmStudioStatus = IsLmStudioOk
+                ? $"✅ Соединение с {_lmStudioProvider.BaseUrl} работает."
+                : $"❌ Не удалось подключиться к {_lmStudioProvider.BaseUrl}. Запустите Local Server в LM Studio.";
         }
 
         // ---------- OPENROUTER ----------

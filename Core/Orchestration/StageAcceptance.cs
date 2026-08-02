@@ -52,33 +52,50 @@ public static class StageAcceptance
             ctx.SharedData["test_ok"] = "skipped";
         }
 
-        // 2) MonoGame smoke — короткий dotnet run с таймаутом
+        // 2) Smoke — короткий dotnet run с таймаутом (игры и службы)
         bool isGame = ctx.Type == ProjectType.MonogameGame
             || stage.Scope.Any(s => s.Equals("Game", StringComparison.OrdinalIgnoreCase));
+        bool isService = ctx.Type == ProjectType.WindowsService;
 
-        if (ok && isGame)
+        if (ok && (isGame || isService))
         {
-            var gameCsproj = NuGetPackageResolver.FindProjectFiles(repo)
-                .FirstOrDefault(p =>
+            var projects = NuGetPackageResolver.FindProjectFiles(repo);
+            string? smokeCsproj = null;
+            if (isGame)
+            {
+                smokeCsproj = projects.FirstOrDefault(p =>
+                {
+                    try { return File.ReadAllText(p).Contains("MonoGame", StringComparison.OrdinalIgnoreCase); }
+                    catch { return false; }
+                });
+            }
+            else if (isService)
+            {
+                smokeCsproj = projects.FirstOrDefault(p =>
                 {
                     try
                     {
-                        return File.ReadAllText(p).Contains("MonoGame", StringComparison.OrdinalIgnoreCase);
+                        var t = File.ReadAllText(p);
+                        return t.Contains("Worker", StringComparison.OrdinalIgnoreCase)
+                            || t.Contains("WindowsServices", StringComparison.OrdinalIgnoreCase);
                     }
                     catch { return false; }
-                }) ?? NuGetPackageResolver.FindProjectFiles(repo).FirstOrDefault();
+                });
+            }
 
-            if (gameCsproj is not null)
+            smokeCsproj ??= projects.FirstOrDefault();
+
+            if (smokeCsproj is not null)
             {
+                var label = isGame ? "monoGame" : "windowsService";
+                var timeout = isGame ? TimeSpan.FromSeconds(12) : TimeSpan.FromSeconds(8);
                 var (smokePassed, smokeLog) = await DotnetRunner.SmokeRunAsync(
-                    gameCsproj, TimeSpan.FromSeconds(12), ct);
-                log.AppendLine("=== monoGame smoke (dotnet run, 12s) ===");
+                    smokeCsproj, timeout, ct);
+                log.AppendLine($"=== {label} smoke (dotnet run, {timeout.TotalSeconds:0}s) ===");
                 log.AppendLine(smokeLog);
                 ctx.SharedData["smoke_ok"] = smokePassed.ToString().ToLowerInvariant();
                 ctx.SharedData["smoke_log"] = smokeLog;
 
-                // Smoke: успех = процесс стартовал и либо ещё жив после таймаута (убили мы),
-                // либо вышел с 0. Падение сразу с ненулевым кодом — fail.
                 if (!smokePassed)
                 {
                     ok = false;

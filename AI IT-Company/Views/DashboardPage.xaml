@@ -17,6 +17,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -35,17 +36,15 @@
                                    FontFamily="Consolas" FontWeight="SemiBold"/>
                         <TextBlock Text="Начат:" Opacity="0.7"/>
                         <TextBlock Text="{x:Bind ViewModel.Runner.StartedAt, Mode=OneWay}"/>
-                    </StackPanel>
-                </InfoBar.Content>
-                <muxc:InfoBar.ActionButton>
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <Button Content="🔁 Повторить этап"
-                                Command="{x:Bind ViewModel.RetryFailedStageCommand}"
-                                IsEnabled="{x:Bind ViewModel.Runner.CanRetryLastFailedStage, Mode=OneWay}"/>
                         <Button Content="⏹ Остановить"
                                 Command="{x:Bind ViewModel.StopCommand}"
                                 IsEnabled="{x:Bind ViewModel.Runner.IsRunning, Mode=OneWay}"/>
                     </StackPanel>
+                </InfoBar.Content>
+                <muxc:InfoBar.ActionButton>
+                    <Button Content="🔁 Повторить этап"
+                            Command="{x:Bind ViewModel.RetryFailedStageCommand}"
+                            IsEnabled="{x:Bind ViewModel.Runner.CanRetryLastFailedStage, Mode=OneWay}"/>
                 </muxc:InfoBar.ActionButton>
             </InfoBar>
 
@@ -154,8 +153,43 @@
                 </StackPanel>
             </Border>
 
+            <!-- История сессий -->
+            <Border Grid.Row="5" BorderThickness="1" CornerRadius="8" Padding="12"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="История сессий" FontWeight="SemiBold" FontSize="16"/>
+                        <Button Content="🔄 Обновить" Command="{x:Bind ViewModel.RefreshSessionsCommand}"/>
+                        <TextBlock Text="{x:Bind ViewModel.SessionsStatus, Mode=OneWay}"
+                                   Opacity="0.7" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <ListView ItemsSource="{x:Bind ViewModel.Sessions, Mode=OneWay}"
+                              MaxHeight="220"
+                              IsItemClickEnabled="True"
+                              ItemClick="Sessions_ItemClick">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="10" Padding="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding StartedAt}" Opacity="0.75" FontSize="12"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Mode}" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Status}" Opacity="0.7"/>
+                                    <TextBlock Grid.Column="3" Text="{Binding Prompt}" TextTrimming="CharacterEllipsis"
+                                               ToolTipService.ToolTip="Клик — открыть папку результата"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </Border>
+
             <!-- Последние события -->
-            <Border Grid.Row="5" BorderThickness="1" CornerRadius="8" Padding="8"
+            <Border Grid.Row="6" BorderThickness="1" CornerRadius="8" Padding="8"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     Visibility="{x:Bind ViewModel.Runner.HasActiveProject, Mode=OneWay}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="360">

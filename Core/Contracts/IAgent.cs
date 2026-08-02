@@ -20,7 +20,8 @@ public enum AgentRole
     Translator,
     Documenter,
     Artist,
-    Analyst
+    Analyst,
+    UxReviewer
 }
 
 public interface IAgent
@@ -36,5 +37,5 @@ public sealed record AgentResult(
     bool Success, string Output, string? Error = null,
     IReadOnlyDictionary<string, string>? Artifacts = null);
 
-public enum ProjectType { Unknown, WinUI, Api, Console, MonogameGame }
-public enum WorkMode { CreateNew, Improve, FixError, Document, Analyze }
+public enum ProjectType { Unknown, WinUI, Api, Console, MonogameGame, Maui, WindowsService }
+public enum WorkMode { CreateNew, Improve, FixError, Document, Analyze, PlanArchitecture }

@@ -1,5 +1,6 @@
 using Build;
 using Core.Contracts;
+using Core.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,32 +10,41 @@ using System.Text;
 namespace Core.Agents;
 
 /// <summary>
-/// Подбирает релевантные файлы проекта по промпту и deliverables этапа
-/// вместо свалки всего репозитория в контекст.
+/// Подбирает релевантные файлы проекта по промпту, deliverables и явным Attachments.
 /// </summary>
 public static class RelevantContextBuilder
 {
     public static string Build(AgentContext ctx, int maxFiles = 12, int maxCharsPerFile = 2200, int maxTotal = 16000)
     {
         var root = ctx.OutputRoot ?? ctx.ProjectPath;
-        if (string.IsNullOrWhiteSpace(root) || ctx.Files.Count == 0)
+        if (string.IsNullOrWhiteSpace(root))
+            return "";
+
+        ExpandAttachmentsIntoFiles(ctx, root);
+
+        if (ctx.Files.Count == 0)
             return "";
 
         var keywords = ExtractKeywords(ctx);
-        if (keywords.Count == 0 && ctx.Mode == WorkMode.CreateNew)
-            return ""; // для нового проекта без файлов смысла мало; после scaffold Files заполнены
+        var forced = ResolveAttachmentFiles(ctx, root);
 
         var scored = new List<(string Path, int Score)>();
+        foreach (var file in forced)
+        {
+            if (!IsTextSource(file)) continue;
+            scored.Add((file, 1000));
+        }
+
         foreach (var file in ctx.Files)
         {
             if (!IsTextSource(file)) continue;
+            if (scored.Any(s => s.Path.Equals(file, StringComparison.OrdinalIgnoreCase))) continue;
             var rel = SafeRel(root, file);
             var score = Score(rel, keywords);
             if (score <= 0) continue;
             scored.Add((file, score));
         }
 
-        // Всегда подмешиваем «якорные» файлы с низким приоритетом.
         foreach (var file in ctx.Files.Where(IsAnchorFile).Take(6))
         {
             if (scored.Any(s => s.Path.Equals(file, StringComparison.OrdinalIgnoreCase))) continue;
@@ -44,12 +54,14 @@ public static class RelevantContextBuilder
         var top = scored
             .OrderByDescending(s => s.Score)
             .ThenBy(s => s.Path, StringComparer.OrdinalIgnoreCase)
-            .Take(maxFiles)
+            .Take(Math.Max(maxFiles, forced.Count))
             .ToList();
 
         if (top.Count == 0) return "";
 
         var sb = new StringBuilder();
+        if (forced.Count > 0)
+            sb.AppendLine($"=== ВЛОЖЕНИЯ ПОЛЬЗОВАТЕЛЯ ({forced.Count}) — приоритет ===");
         sb.AppendLine("=== РЕЛЕВАНТНЫЕ ФАЙЛЫ ПРОЕКТА (выборка по задаче/этапу) ===");
         int total = 0;
         foreach (var (path, score) in top)
@@ -63,7 +75,8 @@ public static class RelevantContextBuilder
                 content = content[..maxCharsPerFile] + "\n... (truncated)";
 
             var rel = SafeRel(root, path).Replace('\\', '/');
-            var block = $"--- {rel} (score={score}) ---\n{content}\n\n";
+            var tag = forced.Any(f => f.Equals(path, StringComparison.OrdinalIgnoreCase)) ? " @attach" : "";
+            var block = $"--- {rel} (score={score}{tag}) ---\n{content}\n\n";
             if (total + block.Length > maxTotal)
             {
                 var remain = maxTotal - total;
@@ -75,6 +88,45 @@ public static class RelevantContextBuilder
         }
 
         return sb.ToString();
+    }
+
+    private static void ExpandAttachmentsIntoFiles(AgentContext ctx, string root)
+    {
+        foreach (var att in ctx.Attachments)
+        {
+            if (att.Kind == AttachmentKind.File && File.Exists(att.Path))
+            {
+                if (!ctx.Files.Contains(att.Path, StringComparer.OrdinalIgnoreCase))
+                    ctx.Files.Add(att.Path);
+            }
+            else if (att.Kind == AttachmentKind.Folder && Directory.Exists(att.Path))
+            {
+                foreach (var f in Directory.EnumerateFiles(att.Path, "*.*", SearchOption.AllDirectories)
+                             .Where(IsTextSource)
+                             .Take(80))
+                {
+                    if (!ctx.Files.Contains(f, StringComparer.OrdinalIgnoreCase))
+                        ctx.Files.Add(f);
+                }
+            }
+        }
+    }
+
+    private static List<string> ResolveAttachmentFiles(AgentContext ctx, string root)
+    {
+        var list = new List<string>();
+        foreach (var att in ctx.Attachments)
+        {
+            if (att.Kind == AttachmentKind.File && File.Exists(att.Path))
+                list.Add(att.Path);
+            else if (att.Kind == AttachmentKind.Folder && Directory.Exists(att.Path))
+            {
+                list.AddRange(Directory.EnumerateFiles(att.Path, "*.*", SearchOption.AllDirectories)
+                    .Where(IsTextSource)
+                    .Take(40));
+            }
+        }
+        return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private static List<string> ExtractKeywords(AgentContext ctx)
@@ -89,15 +141,13 @@ public static class RelevantContextBuilder
             foreach (var s in st.Scope) raw.Append(s).Append(' ');
         }
 
-        var tokens = System.Text.RegularExpressions.Regex
+        return System.Text.RegularExpressions.Regex
             .Split(raw.ToString().ToLowerInvariant(), @"[^a-zA-Zа-яА-Я0-9_\.]+")
             .Where(t => t.Length >= 3)
             .Where(t => !StopWords.Contains(t))
             .Distinct()
             .Take(40)
             .ToList();
-
-        return tokens;
     }
 
     private static int Score(string relativePath, List<string> keywords)
@@ -111,7 +161,6 @@ public static class RelevantContextBuilder
             else if (path.Contains(kw, StringComparison.Ordinal)) score += 2;
         }
 
-        // Бонусы по расширению/типу
         if (path.EndsWith(".csproj")) score += 1;
         if (path.Contains("/entities/") || path.Contains("/services/") || path.Contains("/viewmodels/"))
             score += 1;
@@ -124,7 +173,9 @@ public static class RelevantContextBuilder
         var ext = Path.GetExtension(f);
         return ext.Equals(".cs", StringComparison.OrdinalIgnoreCase)
             || ext.Equals(".xaml", StringComparison.OrdinalIgnoreCase)
-            || ext.Equals(".csproj", StringComparison.OrdinalIgnoreCase);
+            || ext.Equals(".csproj", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".md", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".json", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsAnchorFile(string f)

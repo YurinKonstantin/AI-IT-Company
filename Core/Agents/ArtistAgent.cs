@@ -201,6 +201,18 @@ public sealed class ArtistAgent : AgentBase
 
         await EnsureContentCopyToOutputAsync(root, ct);
 
+        try
+        {
+            var mgcb = await MgcbContentBuilder.EnsureAsync(root, ct);
+            ctx.SharedData["mgcb_summary"] = mgcb.Summary;
+            if (mgcb.MgcbPath is not null)
+                ctx.SharedData["mgcb_path"] = "Content/Content.mgcb";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "[Artist] MGCB/Content step skipped.");
+        }
+
         ctx.SharedData["artist_manifest"] = manifestJson;
         ctx.SharedData["artist_assets"] = string.Join(", ", generated);
         ctx.SharedData["artist_assets_count"] = generated.Count.ToString();

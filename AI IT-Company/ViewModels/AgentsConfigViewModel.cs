@@ -27,7 +27,7 @@ public partial class AgentConfigItem : ObservableObject
     [ObservableProperty] private bool isDirty;
     [ObservableProperty] private string statusText = "";
 
-    public IReadOnlyList<string> AvailableSources { get; } = new[] { "Ollama", "OpenRouter", "ONNX" };
+    public IReadOnlyList<string> AvailableSources { get; } = new[] { "Ollama", "OpenRouter", "LM Studio", "ONNX" };
 
     public AgentConfigItem(AgentRole role, AgentSettings s)
     {
@@ -80,6 +80,7 @@ public partial class AgentConfigItem : ObservableObject
         AgentRole.Documenter => "📚 Документатор",
         AgentRole.Artist => "🎨 Художник (спрайты)",
         AgentRole.Analyst => "🔍 Аналитик",
+        AgentRole.UxReviewer => "🖥 UX-ревьюер",
         _ => r.ToString()
     };
 }

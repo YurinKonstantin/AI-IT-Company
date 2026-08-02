@@ -88,6 +88,9 @@ namespace Core.Agents
                 return new AgentResult(false, log, $"dotnet new {template.DotnetNewName} завершился с ошибкой.");
             }
 
+            if (ctx.Type == ProjectType.WindowsService)
+                await HardenWindowsServiceAsync(outputRoot, projectName, ctx, ct);
+
             // 3) Соберём базовый проект, чтобы удостовериться, что каркас рабочий.
             var (bcode, bso, bse) = await DotnetRunner.RunAsync("build", outputRoot, ct);
             ctx.SharedData["scaffold_build_ok"] = (bcode == 0).ToString().ToLower();
@@ -157,6 +160,62 @@ namespace Core.Agents
             }
 
             return sb.ToString().TrimEnd();
+        }
+
+        private async Task HardenWindowsServiceAsync(
+            string outputRoot, string projectName, AgentContext ctx, CancellationToken ct)
+        {
+            var csproj = NuGetPackageResolver.FindProjectFiles(outputRoot).FirstOrDefault();
+            if (csproj is null) return;
+
+            var (pkgOk, pkgLog) = await DotnetRunner.AddPackageAsync(
+                csproj, "Microsoft.Extensions.Hosting.WindowsServices", version: null, ct);
+            ctx.SharedData["scaffold_winservice_package"] = pkgOk ? "ok" : "fail";
+            ctx.SharedData["scaffold_winservice_package_log"] = pkgLog;
+            if (!pkgOk)
+                Logger.LogWarning("[Scaffolder] Не удалось добавить WindowsServices:\n{Log}", pkgLog);
+
+            TryPatchProgramForWindowsService(outputRoot, projectName);
+        }
+
+        private static void TryPatchProgramForWindowsService(string outputRoot, string projectName)
+        {
+            var candidates = new[]
+            {
+                Path.Combine(outputRoot, "Program.cs"),
+                Path.Combine(outputRoot, projectName, "Program.cs"),
+            };
+
+            foreach (var path in candidates.Where(File.Exists))
+            {
+                try
+                {
+                    var text = File.ReadAllText(path);
+                    if (text.Contains("AddWindowsService", StringComparison.Ordinal)
+                        || text.Contains("UseWindowsService", StringComparison.Ordinal))
+                        return;
+
+                    const string marker = "var builder = Host.CreateApplicationBuilder(args);";
+                    const string insert = """
+                        var builder = Host.CreateApplicationBuilder(args);
+                        builder.Services.AddWindowsService(options =>
+                        {
+                            options.ServiceName = "GeneratedWindowsService";
+                        });
+                        """;
+
+                    if (!text.Contains(marker, StringComparison.Ordinal))
+                        return;
+
+                    text = text.Replace(marker, insert, StringComparison.Ordinal);
+                    File.WriteAllText(path, text);
+                    return;
+                }
+                catch
+                {
+                    /* ignore patch failures */
+                }
+            }
         }
 
         private static string SanitizeName(string s)

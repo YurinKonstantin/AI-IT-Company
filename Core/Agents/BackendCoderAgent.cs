@@ -18,6 +18,8 @@ namespace Core.Agents
         protected override string DefaultSystemPrompt => """
     You are a Backend Coder. Write clean C# (.NET 10):
     services, repositories, SQLite/EF Core, API controllers.
+    For WindowsService / Worker projects: use BackgroundService / IHostedService,
+    Host.CreateApplicationBuilder, AddWindowsService, file/EventLog logging; no UI.
     ALWAYS return code in blocks like:
     ```csharp:Path/To/File.cs
     ... code ...
@@ -25,7 +27,13 @@ No explanations outside the blocks.
 """;
         public BackendCoderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
                         ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore,  logger) { }
-        protected override string BuildUserPrompt(AgentContext ctx) => StageContextBuilder.Build(ctx, coderRole: "Кодер-Бэкенд (C#, сервисы, SQLite/EF Core, API)");
+        protected override string BuildUserPrompt(AgentContext ctx)
+        {
+            var role = ctx.Type == ProjectType.WindowsService
+                ? "Кодер-Бэкенд (Windows Service / Worker, BackgroundService, Hosting)"
+                : "Кодер-Бэкенд (C#, сервисы, SQLite/EF Core, API)";
+            return StageContextBuilder.Build(ctx, coderRole: role);
+        }
 
       
 

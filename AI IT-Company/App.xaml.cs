@@ -1,68 +1,42 @@
 ﻿using Ai;
+using Ai.Hosting;
 using AI_IT_Company.ViewModels;
 using Core;
 using Core.Agents;
 using Core.Configuration;
 using Core.Contracts;
+using Core.Hosting;
 using Core.Orchestration;
 using Core.Services;
 using Data;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
-using Microsoft.UI.Xaml.Shapes;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
 using ViewModels;
-using Windows.ApplicationModel;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
 
 namespace AI_IT_Company
 {
-    /// <summary>
-    /// Provides application-specific behavior to supplement the default Application class.
-    /// </summary>
     public partial class App : Application
     {
         public static IHost Host { get; private set; } = null!;
         public Window? MainWindow;
         public static Window MainWindowRef => ((App)Current).MainWindow!;
+
         public App()
         {
             InitializeComponent();
             Host = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder().ConfigureServices((_, s) =>
             {
                 s.AddLogging(b => b.AddSerilog(new LoggerConfiguration()
-    .WriteTo.File(
-        System.IO.Path.Combine(PathHelper.LogsRoot, "app-.log"),
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 14).CreateLogger()));
-                // БД
-                s.AddDbContextFactory<AppDbContext>();
+                    .WriteTo.File(
+                        System.IO.Path.Combine(PathHelper.LogsRoot, "app-.log"),
+                        rollingInterval: RollingInterval.Day,
+                        retainedFileCountLimit: 14).CreateLogger()));
 
-                // Провайдеры AI
-                s.AddSingleton<WindowsCredentialStore>();
-                s.AddSingleton<OllamaProvider>(_ => new OllamaProvider("http://localhost:11434"));
-                s.AddSingleton<OpenRouterProvider>(sp =>
-                    new OpenRouterProvider(
-                        sp.GetRequiredService<WindowsCredentialStore>(),
-                        "https://openrouter.ai/api/v1"));
-                s.AddSingleton<OnnxProvider>(_ => new OnnxProvider(PathHelper.ModelsRoot));
+                s.AddAiItProviders();
+                s.AddAiItPipeline();
 
                 // Image-gen для Artist (OpenRouter / Ollama); procedural — fallback внутри ArtistAgent.
                 s.AddSingleton<IImageGenClient>(sp =>
@@ -80,58 +54,17 @@ namespace AI_IT_Company
                         () => settings.Get(AppSettingsStore.KeyOllamaUrl, AppSettingsStore.KeyOllamaDefaultUrl));
                 });
 
-                // Фабрика — через ИНТЕРФЕЙС
-                s.AddSingleton<IAiProviderFactory, AiProviderFactory>();
-
-                // Настройки агентов
-                s.AddSingleton<AgentConfigStore>();
-
-                // Агенты через IAgent
-                s.AddTransient<IAgent, InterpreterAgent>();
-                s.AddTransient<IAgent, ArchitectAgent>();
-                s.AddTransient<IAgent, BackendCoderAgent>();
-                s.AddTransient<IAgent, FrontendCoderAgent>();
-                s.AddTransient<IAgent, FullstackCoderAgent>();
-                s.AddTransient<IAgent, GameCoderAgent>();
-                s.AddTransient<IAgent, ArtistAgent>();
-                s.AddTransient<IAgent, TesterAgent>();
-                s.AddTransient<IAgent, BuilderAgent>();
-                s.AddTransient<IAgent, ErrorFixerAgent>();
-                s.AddTransient<IAgent, SecretaryAgent>();
-                s.AddTransient<IAgent, ScaffolderAgent>();
-                s.AddTransient<IAgent, DocumenterAgent>();
-                s.AddTransient<IAgent, AnalystAgent>();
-               // s.AddTransient<IAgent, TranslatorAgent>();
-
-                // Legacy AgentPipeline намеренно не регистрируется — используем StagedPipeline.
-                s.AddTransient<StagedPipeline>();
                 s.AddTransient<AgentsConfigViewModel>();
-                s.AddSingleton<OllamaClient>(_ => new OllamaClient("http://localhost:11434"));
                 s.AddTransient<ModelsViewModel>();
-                
-                s.AddSingleton<AppSettingsStore>();
-                s.AddSingleton<AgentPromptStore>();
                 s.AddTransient<SettingsViewModel>();
+                s.AddTransient<ChangesViewModel>();
+                s.AddTransient<AI_IT_Company.ViewModels.HelpViewModel>();
 
-
-                // Новый сервис — синглтон для всех страниц
                 s.AddSingleton<AI_IT_Company.Services.PipelineRunService>();
-
-                // ChatViewModel теперь Singleton — состояние переживает навигацию
                 s.AddSingleton<ChatViewModel>();
-               
-
-                // Новые ViewModel-и
                 s.AddSingleton<AI_IT_Company.ViewModels.DashboardViewModel>();
                 s.AddSingleton<AI_IT_Company.ViewModels.LogsViewModel>();
-
-              
-
-
-
-                s.AddSingleton<TranslatorAgent>();                // явный singleton для сервиса
-                s.AddTransient<IAgent>(sp => sp.GetRequiredService<TranslatorAgent>()); 
-                s.AddSingleton<ITranslationService, TranslationService>();
+                s.AddSingleton<AI_IT_Company.ViewModels.FreelanceViewModel>();
             }).Build();
         }
 
@@ -140,28 +73,20 @@ namespace AI_IT_Company
             var appSettings = Host.Services.GetRequiredService<AppSettingsStore>();
             await appSettings.InitializeAsync();
 
-            var url = appSettings.Get(AppSettingsStore.KeyOllamaUrl,
-                                      AppSettingsStore.KeyOllamaDefaultUrl);
-            Host.Services.GetRequiredService<OllamaClient>().SetBaseUrl(url);
-            Host.Services.GetRequiredService<OllamaProvider>().SetBaseUrl(url);
-
-            var openRouterUrl = appSettings.GetOpenRouterBaseUrl();
-            Host.Services.GetRequiredService<OpenRouterProvider>().SetBaseUrl(openRouterUrl);
-
-            var onnxPath = appSettings.GetOnnxModelsPath();
-            Host.Services.GetRequiredService<OnnxProvider>().SetModelsRoot(onnxPath);
+            AiProviderServiceCollectionExtensions.ApplyProviderUrlsFromSettings(Host.Services);
 
             await Host.Services.GetRequiredService<AgentConfigStore>().InitializeAsync();
             await Host.Services.GetRequiredService<AgentPromptStore>().InitializeAsync();
+            await Host.Services.GetRequiredService<SessionStore>().InitializeAsync();
+            await Host.Services.GetRequiredService<Core.Freelance.FreelanceJobStore>().InitializeAsync();
+            await Host.Services.GetRequiredService<Core.Freelance.FreelanceStatsService>().EnsureSchemaAsync();
 
             MainWindow = new MainWindow();
             MainWindow.Activate();
-           
+
             Host.Services
                 .GetRequiredService<AI_IT_Company.Services.PipelineRunService>()
                 .AttachUi(MainWindow.DispatcherQueue);
         }
     }
 }
-
-

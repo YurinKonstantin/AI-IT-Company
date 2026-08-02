@@ -97,7 +97,14 @@ public static class ProjectScanner
 
         if (txt.Contains("MonoGame", StringComparison.OrdinalIgnoreCase)) return "MonogameGame";
         if (txt.Contains("Microsoft.WindowsAppSDK", StringComparison.OrdinalIgnoreCase)) return "WinUI";
+        if (txt.Contains("Microsoft.Maui", StringComparison.OrdinalIgnoreCase)
+            || txt.Contains("UseMaui", StringComparison.OrdinalIgnoreCase)) return "Maui";
         if (txt.Contains("Microsoft.AspNetCore", StringComparison.OrdinalIgnoreCase)) return "Api";
+        if (txt.Contains("Microsoft.NET.Sdk.Worker", StringComparison.OrdinalIgnoreCase)
+            || txt.Contains("Microsoft.Extensions.Hosting.WindowsServices", StringComparison.OrdinalIgnoreCase)
+            || txt.Contains("UseWindowsService", StringComparison.OrdinalIgnoreCase))
+            return "WindowsService";
+
         return "Console";
     }
 

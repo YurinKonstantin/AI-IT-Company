@@ -43,9 +43,12 @@ public sealed partial class MainWindow : Window
         {
             "chat" => typeof(ChatPage),
             "dashboard" => typeof(DashboardPage),
+            "changes" => typeof(ChangesPage),
+            "freelance" => typeof(FreelancePage),
             "agents" => typeof(AgentsConfigPage),
             "models" => typeof(ModelsPage),
             "logs" => typeof(LogsPage),
+            "help" => typeof(HelpPage),
             "settings" => typeof(SettingsPage),
             _ => null
         };

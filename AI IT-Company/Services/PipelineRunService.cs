@@ -24,6 +24,8 @@ namespace AI_IT_Company.Services
     {
         private readonly IServiceProvider _sp;
         private readonly ILogger<PipelineRunService> _logger;
+        private readonly SessionStore _sessions;
+        private readonly PendingChangeService _pending;
         private DispatcherQueue? _ui;
 
         private CancellationTokenSource? _cts;
@@ -48,6 +50,7 @@ namespace AI_IT_Company.Services
         [ObservableProperty] private string statusText = "Готов к работе";
         [ObservableProperty] private string? lastFailedStageId;
         [ObservableProperty] private bool canRetryLastFailedStage;
+        [ObservableProperty] private bool awaitingChangeReview;
 
         public bool HasActiveProject => !string.IsNullOrEmpty(CurrentProjectId);
         public int ProgressPercent => TotalStages == 0 ? 0
@@ -61,11 +64,20 @@ namespace AI_IT_Company.Services
         partial void OnIsRunningChanged(bool value) => RefreshCanRetry();
         partial void OnLastFailedStageIdChanged(string? value) => RefreshCanRetry();
 
-        public PipelineRunService(IServiceProvider sp, ILogger<PipelineRunService> logger, ITranslationService translator)
+        public PipelineRunService(
+            IServiceProvider sp,
+            ILogger<PipelineRunService> logger,
+            ITranslationService translator,
+            SessionStore sessions,
+            PendingChangeService pending)
         {
             _sp = sp;
             _logger = logger;
             _translator = translator;
+            _sessions = sessions;
+            _pending = pending;
+            _pending.Changed += (_, _) =>
+                RunOnUi(() => AwaitingChangeReview = _pending.AwaitingUserDecision);
         }
 
         public void AttachUi(DispatcherQueue ui) => _ui = ui;
@@ -76,6 +88,7 @@ namespace AI_IT_Company.Services
 
             _cts = new CancellationTokenSource();
             _currentContext = ctx;
+            _pending.Clear();
 
             var pipeline = _sp.GetRequiredService<StagedPipeline>();
 
@@ -96,7 +109,11 @@ namespace AI_IT_Company.Services
                 LastFailedStageId = null;
                 CurrentMode = ModeLabel(ctx.Mode);
                 StatusText = $"{CurrentMode}: запуск…";
+                AwaitingChangeReview = false;
             });
+
+            try { await _sessions.StartAsync(ctx); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Session start failed"); }
 
             await RunPipelineJobAsync(pipeline, p => p.RunAsync(ctx, _cts!.Token));
         }
@@ -194,6 +211,16 @@ namespace AI_IT_Company.Services
                 finally
                 {
                     try { await reader; } catch { }
+                    var status = FailedStages > 0 ? "Failed" : "Succeeded";
+                    if (_cts?.IsCancellationRequested == true) status = "Cancelled";
+                    var summary = $"{CurrentMode}: {status}; stages ok={CompletedStages} fail={FailedStages} skip={SkippedStages}";
+                    var sid = CurrentProjectId;
+                    if (!string.IsNullOrEmpty(sid))
+                    {
+                        try { await _sessions.FinishAsync(sid, status, summary); }
+                        catch (Exception ex) { _logger.LogWarning(ex, "Session finish failed"); }
+                    }
+
                     RunOnUi(() =>
                     {
                         IsRunning = false;
@@ -201,6 +228,7 @@ namespace AI_IT_Company.Services
                         StatusText = FailedStages > 0
                             ? $"{CurrentMode}: завершено с ошибками"
                             : $"{CurrentMode}: готово";
+                        AwaitingChangeReview = _pending.AwaitingUserDecision;
                         RefreshCanRetry();
                     });
                 }
@@ -245,6 +273,13 @@ namespace AI_IT_Company.Services
                     case "acceptance-fail":
                         StatusText = $"{CurrentMode}: приёмка провалена";
                         break;
+                    case "pending-change":
+                        StatusText = $"{CurrentMode}: ожидание Apply/Reject — {Truncate(ev.Payload, 80)}";
+                        AwaitingChangeReview = true;
+                        break;
+                    case "terminal":
+                        // статус не затираем длинным логом
+                        break;
                 }
 
                 if (TotalStages == 0 && _currentContext?.Plan is not null)
@@ -260,6 +295,7 @@ namespace AI_IT_Company.Services
             if (ev.Kind is "done"
                 && ev.Role is not AgentRole.Architect and not AgentRole.Secretary
                     and not AgentRole.Documenter and not AgentRole.Artist and not AgentRole.Analyst
+                    and not AgentRole.UxReviewer
                 && ev.Payload.Length > 200
                 && _translator.IsEnabled)
             {
@@ -325,6 +361,7 @@ namespace AI_IT_Company.Services
             WorkMode.FixError => "Исправление",
             WorkMode.Document => "Документирование",
             WorkMode.Analyze => "Анализ",
+            WorkMode.PlanArchitecture => "ТЗ / архитектура",
             _ => mode.ToString()
         };
 
@@ -344,6 +381,9 @@ namespace AI_IT_Company.Services
             "acceptance-ok" => "☑",
             "acceptance-fail" => "☒",
             "stages-summary" => "📊",
+            "terminal" => "⌨",
+            "pending-change" => "📝",
+            "stage-docs" => "📚",
             _ => "•"
         };
 

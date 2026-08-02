@@ -34,8 +34,33 @@ namespace Core.Orchestration
 
         public async Task RunAsync(AgentContext ctx, CancellationToken ct)
         {
+            AttachEventSink(ctx);
+
             // 1) Интерпретация задачи (режим UI с ModeLocked не перезаписывается)
             await RunAgent(AgentRole.Interpreter, ctx, ct);
+
+            var intent = ctx.SharedData.GetValueOrDefault("interpreter_intent", "?");
+            var conf = ctx.SharedData.GetValueOrDefault("interpreter_confidence", "?");
+            await Emit(AgentRole.Interpreter, "info",
+                $"Определено: {ctx.Type} · {ctx.Mode} · intent={intent} (confidence {conf})");
+
+            if (ctx.SharedData.GetValueOrDefault("interpreter_low_confidence") == "true")
+            {
+                await Emit(AgentRole.Interpreter, "warn",
+                    "Низкая уверенность классификации — fallback: CreateNew. Уточните задачу или выберите режим вручную.");
+            }
+
+            bool needsExisting = ctx.Mode is WorkMode.Improve or WorkMode.FixError
+                or WorkMode.Document or WorkMode.Analyze
+                || ctx.SharedData.GetValueOrDefault("interpreter_needs_existing") == "true";
+
+            if (needsExisting && ModeLooksLikeEmptyOutput(ctx))
+            {
+                await Emit(AgentRole.Interpreter, "error",
+                    "Для этого режима нужна папка существующего проекта. Укажите путь и повторите.");
+                Events.Writer.TryComplete();
+                return;
+            }
 
             var repo = ctx.OutputRoot
                     ?? ctx.ProjectPath
@@ -65,12 +90,83 @@ namespace Core.Orchestration
                     Events.Writer.TryComplete();
                     return;
 
+                case WorkMode.PlanArchitecture:
+                    await RunPlanArchitectureAsync(ctx, repo, ct);
+                    Events.Writer.TryComplete();
+                    return;
+
                 default:
                     // CreateNew — полный путь
                     await RunCreateNewAsync(ctx, repo, ct);
                     Events.Writer.TryComplete();
                     return;
             }
+        }
+
+        /// <summary>
+        /// Только ТЗ / архитектура: Architect → Secretary, без scaffold/кодеров/сборки.
+        /// </summary>
+        private async Task RunPlanArchitectureAsync(AgentContext ctx, string repo, CancellationToken ct)
+        {
+            await Emit(AgentRole.Architect, "info",
+                "Режим PlanArchitecture: только ТЗ и план, без кода и сборки.");
+
+            if (Directory.Exists(repo) && Directory.EnumerateFileSystemEntries(repo).Any())
+                RefreshProjectScan(ctx, repo);
+
+            await RunAgent(AgentRole.Architect, ctx, ct);
+            if (ctx.Plan is null)
+            {
+                await Emit(AgentRole.Architect, "error", "План/ТЗ не сформирован — прекращаем.");
+                return;
+            }
+
+            try
+            {
+                var tzPath = Path.Combine(repo, "TZ.md");
+                var body = new StringBuilder();
+                body.AppendLine($"# {ctx.Plan.Title}");
+                body.AppendLine();
+                body.AppendLine(ctx.Plan.Summary ?? "");
+                body.AppendLine();
+                body.AppendLine("## Features");
+                foreach (var f in ctx.Plan.Features ?? [])
+                    body.AppendLine($"- **{f.Name}**: {f.Description} ({f.Advantage})");
+                body.AppendLine();
+                body.AppendLine("## Stages");
+                foreach (var s in ctx.Plan.Stages ?? [])
+                    body.AppendLine($"- `{s.Id}` {s.Name}: {s.Goal}");
+                await File.WriteAllTextAsync(tzPath, body.ToString(), ct);
+                ctx.SharedData["tz_path"] = tzPath;
+                await Emit(AgentRole.Architect, "info", $"TZ.md → {tzPath}");
+            }
+            catch (Exception ex)
+            {
+                await Emit(AgentRole.Architect, "warn", "Не удалось записать TZ.md: " + ex.Message);
+            }
+
+            await RunAgent(AgentRole.Secretary, ctx, ct);
+        }
+
+        /// <summary>
+        /// Путь ещё не указывает на реальный проект (только свежий output root без исходников).
+        /// </summary>
+        private static bool ModeLooksLikeEmptyOutput(AgentContext ctx)
+        {
+            var path = ctx.ProjectPath ?? ctx.OutputRoot;
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+                return true;
+
+            // Если сканер уже нашёл файлы — проект есть.
+            if (ctx.Files.Count > 0) return false;
+
+            try
+            {
+                return !Directory.EnumerateFiles(path, "*.csproj", SearchOption.AllDirectories).Any()
+                    && !Directory.EnumerateFiles(path, "*.sln", SearchOption.AllDirectories).Any()
+                    && !Directory.EnumerateFiles(path, "*.slnx", SearchOption.AllDirectories).Any();
+            }
+            catch { return true; }
         }
 
         private async Task RunCreateNewAsync(AgentContext ctx, string repo, CancellationToken ct)
@@ -106,6 +202,8 @@ namespace Core.Orchestration
         /// </summary>
         public async Task ResumeStagesAsync(AgentContext ctx, CancellationToken ct)
         {
+            AttachEventSink(ctx);
+
             var repo = ctx.OutputRoot
                     ?? ctx.ProjectPath
                     ?? PathHelper.GetProjectOutputRoot(ctx.ProjectId);
@@ -233,8 +331,13 @@ namespace Core.Orchestration
             int attempt = 0;
             while (ctx.SharedData.GetValueOrDefault("build_ok") == "false" && attempt++ < maxAttempts)
             {
+                await Emit(AgentRole.ErrorFixer, "info",
+                    $"Fix loop {attempt}/{maxAttempts}: ErrorFixer → Builder");
                 ctx.SharedData.Remove("fix_code");
                 await RunAgent(AgentRole.ErrorFixer, ctx, ct);
+                var fixedFiles = ctx.SharedData.GetValueOrDefault("last_fixed_files", "");
+                if (!string.IsNullOrWhiteSpace(fixedFiles))
+                    await Emit(AgentRole.ErrorFixer, "info", "fixed: " + fixedFiles);
                 await RunAgent(AgentRole.Builder, ctx, ct);
             }
             return ctx.SharedData.GetValueOrDefault("build_ok") == "true";
@@ -388,9 +491,17 @@ namespace Core.Orchestration
 
                 if (next.Scope.Contains("Game", StringComparer.OrdinalIgnoreCase))
                 {
-                    // Сначала художник генерирует спрайты, затем кодер их подключает.
+                    // Сначала художник генерирует спрайты, затем MGCB/Content, затем кодер.
                     await RunAgent(AgentRole.Artist, ctx, ct);
+                    await EnsureMgcbContentAsync(ctx, repo, ct);
                     await RunAgent(AgentRole.GameCoder, ctx, ct);
+                }
+
+                // UX-ревью после UI-кода (WinUI / MAUI) — только отчёт, без правок.
+                if (wantsFrontend
+                    && ctx.Type is ProjectType.WinUI or ProjectType.Maui)
+                {
+                    await RunAgent(AgentRole.UxReviewer, ctx, ct);
                 }
 
                 if (next.Scope.Contains("Tests", StringComparer.OrdinalIgnoreCase))
@@ -506,11 +617,49 @@ namespace Core.Orchestration
             int attempt = 0;
             while (ctx.SharedData.GetValueOrDefault("build_ok") == "false" && attempt++ < maxAttempts)
             {
+                await Emit(AgentRole.ErrorFixer, "info",
+                    $"Шаг фикса {attempt}/{maxAttempts}: анализ build_log → правка → повторная сборка");
                 ctx.SharedData.Remove("fix_code");
                 await RunAgent(AgentRole.ErrorFixer, ctx, ct);
+                var analysis = ctx.SharedData.GetValueOrDefault("last_fix_analysis", "");
+                var fixedFiles = ctx.SharedData.GetValueOrDefault("last_fixed_files", "");
+                if (!string.IsNullOrWhiteSpace(analysis))
+                    await Emit(AgentRole.ErrorFixer, "info", TruncatePayload("analysis: " + analysis, 500));
+                if (!string.IsNullOrWhiteSpace(fixedFiles))
+                    await Emit(AgentRole.ErrorFixer, "info", "fixed: " + fixedFiles);
                 await RunAgent(AgentRole.Builder, ctx, ct);
             }
             return ctx.SharedData.GetValueOrDefault("build_ok") == "true";
+        }
+
+        private void AttachEventSink(AgentContext ctx)
+        {
+            ctx.RaiseEvent = (role, kind, payload) =>
+            {
+                Events.Writer.TryWrite(new PipelineEvent(role, kind, payload ?? "", DateTime.UtcNow));
+            };
+        }
+
+        private static string TruncatePayload(string s, int max)
+            => string.IsNullOrEmpty(s) ? "" : s.Length <= max ? s : s[..max] + "…";
+
+        // -------------------- CONTENT / MGCB --------------------
+
+        private async Task EnsureMgcbContentAsync(AgentContext ctx, string repo, CancellationToken ct)
+        {
+            try
+            {
+                var result = await MgcbContentBuilder.EnsureAsync(repo, ct);
+                ctx.SharedData["mgcb_summary"] = result.Summary;
+                ctx.SharedData["mgcb_sprites"] = result.SpriteCount.ToString();
+                if (result.MgcbPath is not null)
+                    ctx.SharedData["mgcb_path"] = "Content/Content.mgcb";
+                await Emit(AgentRole.Artist, result.SpriteCount > 0 ? "info" : "warn", result.Summary);
+            }
+            catch (Exception ex)
+            {
+                await Emit(AgentRole.Artist, "warn", "MGCB/Content step failed: " + ex.Message);
+            }
         }
 
         // -------------------- УТИЛИТЫ --------------------

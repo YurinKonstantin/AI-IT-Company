@@ -31,11 +31,14 @@
             Loaded="NavView_Loaded">
 
             <muxc:NavigationView.MenuItems>
-                <muxc:NavigationViewItem Content="Чат"       Tag="chat"      Icon="Message"/>
-                <muxc:NavigationViewItem Content="Дашборд"   Tag="dashboard" Icon="Home"/>
-                <muxc:NavigationViewItem Content="Агенты"    Tag="agents"    Icon="People"/>
-                <muxc:NavigationViewItem Content="Модели"    Tag="models"    Icon="Download"/>
-                <muxc:NavigationViewItem Content="Логи"      Tag="logs"      Icon="Document"/>
+                <muxc:NavigationViewItem Content="Чат"         Tag="chat"      Icon="Message"/>
+                <muxc:NavigationViewItem Content="Дашборд"     Tag="dashboard" Icon="Home"/>
+                <muxc:NavigationViewItem Content="Изменения"   Tag="changes"   Icon="Edit"/>
+                <muxc:NavigationViewItem Content="Фриланс"     Tag="freelance" Icon="Shop"/>
+                <muxc:NavigationViewItem Content="Агенты"      Tag="agents"    Icon="People"/>
+                <muxc:NavigationViewItem Content="Модели"      Tag="models"    Icon="Download"/>
+                <muxc:NavigationViewItem Content="Логи"        Tag="logs"      Icon="Document"/>
+                <muxc:NavigationViewItem Content="Справка"     Tag="help"      Icon="Help"/>
             </muxc:NavigationView.MenuItems>
 
             <muxc:NavigationView.FooterMenuItems>

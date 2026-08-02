@@ -78,6 +78,13 @@ public sealed class ArchitectAgent : AgentBase
     - Plan ONLY the delta requested by the user (enhancements/refactors).
     - Prefer fewer stages (1–4). Reuse existing modules; avoid rewriting the whole app.
     - Mention in summary what stays unchanged.
+
+    PLAN ARCHITECTURE MODE (Mode=PlanArchitecture):
+    - Produce a clear TZ and stage plan only. Prefer 2–5 stages.
+    - Do NOT assume code will be written in this run.
+    - For WindowsService: scope mainly ["Backend"]; cover Worker/BackgroundService, logging, install notes.
+    - For Maui: scope ["Backend","Frontend"] as appropriate for cross-platform UI.
+    - For MonogameGame: include ["Game"] stages.
 """;
 
     public ArchitectAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore, ITranslationService translator,
@@ -98,6 +105,28 @@ public sealed class ArchitectAgent : AgentBase
               Do not assume a new empty project. Prefer small incremental stages.
               Use structure/metrics below as ground truth about what already exists.
               """,
+            WorkMode.PlanArchitecture => """
+              IMPORTANT: Mode is PlanArchitecture. Deliver TZ + staged plan only.
+              No coding will happen in this run. Keep stages conceptual and testable later.
+              """,
+            _ => ""
+        };
+
+        var typeHint = ctx.Type switch
+        {
+            ProjectType.WindowsService => """
+              Project type is WindowsService: Worker / IHostedService, no UI.
+              Prefer scope ["Backend"] (and ["Tests"] if useful). Mention install/uninstall as docs constraints, not code file names.
+              """,
+            ProjectType.Maui => """
+              Project type is .NET MAUI: cross-platform UI. Prefer Backend+Frontend scopes; avoid WinUI-specific assumptions.
+              """,
+            ProjectType.MonogameGame => """
+              Project type is MonoGame: include Game scope; assets may be produced by Artist before GameCoder.
+              """,
+            ProjectType.Api => """
+              Project type is ASP.NET Core Web API: Backend (+ Tests). No desktop UI stages.
+              """,
             _ => ""
         };
 
@@ -109,6 +138,7 @@ public sealed class ArchitectAgent : AgentBase
             Project type: {ctx.Type}
             Mode: {ctx.Mode}
             {modeHint}
+            {typeHint}
 
             Existing files:
             {files}

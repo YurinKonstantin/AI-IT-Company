@@ -8,9 +8,15 @@ namespace Build;
 
 public static class DotnetRunner
 {
+    /// <summary>Опциональный sink для ленты событий (команда + stdout/stderr).</summary>
+    public static Action<string>? TerminalSink { get; set; }
+
     public static async Task<(int Code, string Out, string Err)> RunAsync(
         string args, string workingDir, CancellationToken ct)
     {
+        var cmd = $"dotnet {args}";
+        TerminalSink?.Invoke($"$ {cmd}  (cwd: {workingDir})");
+
         var psi = new ProcessStartInfo("dotnet", args)
         {
             WorkingDirectory = workingDir,
@@ -23,8 +29,20 @@ public static class DotnetRunner
         var so = p.StandardOutput.ReadToEndAsync(ct);
         var se = p.StandardError.ReadToEndAsync(ct);
         await p.WaitForExitAsync(ct);
-        return (p.ExitCode, await so, await se);
+        var stdout = await so;
+        var stderr = await se;
+
+        if (!string.IsNullOrWhiteSpace(stdout))
+            TerminalSink?.Invoke(Truncate(stdout.TrimEnd(), 2500));
+        if (!string.IsNullOrWhiteSpace(stderr))
+            TerminalSink?.Invoke("[stderr]\n" + Truncate(stderr.TrimEnd(), 1500));
+        TerminalSink?.Invoke($"exit {p.ExitCode}");
+
+        return (p.ExitCode, stdout, stderr);
     }
+
+    private static string Truncate(string s, int max)
+        => string.IsNullOrEmpty(s) ? "" : s.Length <= max ? s : s[..max] + "…";
 
     public static Task<(int Code, string Out, string Err)> RestoreAsync(
         string workingDir, CancellationToken ct)

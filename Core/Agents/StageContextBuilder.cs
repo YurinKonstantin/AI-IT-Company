@@ -202,9 +202,10 @@ namespace Core.Agents
                 Манифест Content/assets.manifest.json:
                 {Truncate(manifest, 6000)}
 
-                Загрузка (пример):
+                Загрузка (рекомендуется — см. Content/LOADING.md):
                 using var stream = TitleContainer.OpenStream("Content/Sprites/player.png");
                 var tex = Texture2D.FromStream(GraphicsDevice, stream);
+                Content/Content.mgcb обновлён для опциональной сборки .xnb (не обязателен).
                 Не заменяй эти файлы цветными заглушками.
                 """;
         }

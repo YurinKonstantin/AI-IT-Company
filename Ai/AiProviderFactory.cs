@@ -9,17 +9,20 @@ public sealed class AiProviderFactory : IAiProviderFactory
     private readonly OllamaProvider _ollama;
     private readonly OpenRouterProvider _openRouter;
     private readonly OnnxProvider _onnx;
+    private readonly LmStudioProvider _lmStudio;
     private readonly ILogger<AiProviderFactory> _logger;
 
     public AiProviderFactory(
         OllamaProvider ollama,
         OpenRouterProvider openRouter,
         OnnxProvider onnx,
+        LmStudioProvider lmStudio,
         ILogger<AiProviderFactory> logger)
     {
         _ollama = ollama;
         _openRouter = openRouter;
         _onnx = onnx;
+        _lmStudio = lmStudio;
         _logger = logger;
     }
 
@@ -28,6 +31,7 @@ public sealed class AiProviderFactory : IAiProviderFactory
         "ollama" => _ollama,
         "openrouter" => _openRouter,
         "onnx" or "microsoft" => _onnx,
+        "lmstudio" or "lm studio" or "lm-studio" => _lmStudio,
         _ => FallbackToOllama(source)
     };
 

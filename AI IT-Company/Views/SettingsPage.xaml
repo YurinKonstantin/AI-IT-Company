@@ -19,7 +19,7 @@
                 <StackPanel Spacing="16">
                     <TextBlock Text="Провайдеры AI" FontSize="18" FontWeight="SemiBold"/>
                     <TextBlock Opacity="0.7" TextWrapping="Wrap"
-                               Text="Приоритет — локальный запуск (Ollama / ONNX). OpenRouter — облачный запасной вариант. Источник для каждого агента выбирается на странице «Агенты»."/>
+                               Text="Приоритет — локальный запуск (Ollama / LM Studio / ONNX). OpenRouter — облачный запасной вариант. Источник для каждого агента выбирается на странице «Агенты»."/>
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <ComboBox Header="Провайдер по умолчанию"
@@ -50,6 +50,23 @@
                                 VerticalAlignment="Bottom"/>
                     </StackPanel>
                     <TextBlock Text="{x:Bind ViewModel.OllamaStatus, Mode=OneWay}" Opacity="0.85"/>
+
+                    <!-- LM Studio -->
+                    <TextBlock Text="LM Studio (локально, OpenAI-compatible)" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBox PlaceholderText="http://localhost:1234/v1"
+                                 Header="Base URL"
+                                 Width="380"
+                                 Text="{x:Bind ViewModel.LmStudioUrl, Mode=TwoWay}"/>
+                        <Button Content="💾 Сохранить"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Command="{x:Bind ViewModel.SaveLmStudioCommand}"
+                                VerticalAlignment="Bottom"/>
+                        <Button Content="🔌 Проверить"
+                                Command="{x:Bind ViewModel.CheckLmStudioCommand}"
+                                VerticalAlignment="Bottom"/>
+                    </StackPanel>
+                    <TextBlock Text="{x:Bind ViewModel.LmStudioStatus, Mode=OneWay}" Opacity="0.85"/>
 
                     <!-- OpenRouter -->
                     <TextBlock Text="OpenRouter (интернет)" FontWeight="SemiBold" Margin="0,8,0,0"/>
@@ -125,6 +142,100 @@
                     Command="{x:Bind ViewModel.SaveCoderModeCommand}"/>
                         <TextBlock Text="{x:Bind ViewModel.CoderModeStatus, Mode=OneWay}"
                        VerticalAlignment="Center" Opacity="0.75"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ============= FREELANCE ============= -->
+            <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Биржа / фриланс" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                               Text="Источники: Demo, GitHub bounties (Issues), FL.ru/Kwork через JSON feed URL. Авто-принятие запускает только внутренний пайплайн, без отклика на бирже."/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <CheckBox Content="Demo" IsChecked="{x:Bind ViewModel.FreelanceEnableDemo, Mode=TwoWay}"/>
+                        <CheckBox Content="GitHub bounties" IsChecked="{x:Bind ViewModel.FreelanceEnableGitHub, Mode=TwoWay}"/>
+                        <CheckBox Content="FL.ru feed" IsChecked="{x:Bind ViewModel.FreelanceEnableFlRu, Mode=TwoWay}"/>
+                        <CheckBox Content="Kwork feed" IsChecked="{x:Bind ViewModel.FreelanceEnableKwork, Mode=TwoWay}"/>
+                    </StackPanel>
+
+                    <TextBox Header="Навыки (через запятую)"
+                             Text="{x:Bind ViewModel.FreelanceSkills, Mode=TwoWay}"/>
+                    <TextBox Header="Ключевые слова охоты"
+                             Text="{x:Bind ViewModel.FreelanceKeywords, Mode=TwoWay}"/>
+                    <TextBox Header="GitHub search query"
+                             PlaceholderText="is:issue is:open label:bounty"
+                             Text="{x:Bind ViewModel.FreelanceGitHubQuery, Mode=TwoWay}"/>
+                    <TextBox Header="GitHub PAT (опционально, для лимита API)"
+                             PlaceholderText="ghp_..."
+                             Text="{x:Bind ViewModel.GitHubPatInput, Mode=TwoWay}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{x:Bind ViewModel.HasGitHubPat, Mode=OneWay}" Opacity="0.7"
+                                   VerticalAlignment="Center"/>
+                        <Button Content="🗑 Удалить PAT" Command="{x:Bind ViewModel.ClearGitHubPatCommand}"/>
+                    </StackPanel>
+
+                    <TextBox Header="Ставка $/час" Width="160" HorizontalAlignment="Left"
+                             Text="{x:Bind ViewModel.FreelanceHourlyRate, Mode=TwoWay}"/>
+                    <CheckBox Content="Авто-принятие во внутренний пайплайн (opt-in)"
+                              IsChecked="{x:Bind ViewModel.FreelanceAutoAccept, Mode=TwoWay}"/>
+                    <CheckBox Content="Только симуляция (hunt+score без Accept)"
+                              IsChecked="{x:Bind ViewModel.FreelanceSimulationOnly, Mode=TwoWay}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBox Header="Порог score" Width="120"
+                                 Text="{x:Bind ViewModel.FreelanceAutoAcceptThreshold, Mode=TwoWay}"/>
+                        <TextBox Header="Мин. прибыль" Width="120"
+                                 Text="{x:Bind ViewModel.FreelanceMinProfit, Mode=TwoWay}"/>
+                    </StackPanel>
+                    <TextBox Header="FL.ru JSON feed URL"
+                             Text="{x:Bind ViewModel.FreelanceFlRuFeedUrl, Mode=TwoWay}"/>
+                    <TextBox Header="Kwork JSON feed URL"
+                             Text="{x:Bind ViewModel.FreelanceKworkFeedUrl, Mode=TwoWay}"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="💾 Сохранить биржу"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Command="{x:Bind ViewModel.SaveFreelanceCommand}"/>
+                        <TextBlock Text="{x:Bind ViewModel.FreelanceStatus, Mode=OneWay}"
+                                   VerticalAlignment="Center" Opacity="0.8"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ============= CHANGES / EDITOR ============= -->
+            <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Изменения и редактор" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                               Text="В режимах Improve/Fix пайплайн может ждать Apply/Reject на вкладке «Изменения». CreateNew по умолчанию применяет правки сразу (режим ImproveFix)."/>
+
+                    <ComboBox Header="Ревью правок перед сборкой"
+                              MinWidth="420"
+                              ItemsSource="{x:Bind ViewModel.ReviewChangesModeOptions}"
+                              SelectedIndex="{x:Bind ViewModel.ReviewChangesModeIndex, Mode=TwoWay}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="💾 Сохранить"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Command="{x:Bind ViewModel.SaveReviewChangesCommand}"/>
+                        <TextBlock Text="{x:Bind ViewModel.ReviewChangesStatus, Mode=OneWay}"
+                                   VerticalAlignment="Center" Opacity="0.75"/>
+                    </StackPanel>
+
+                    <TextBox Header="Внешний редактор (путь к exe)"
+                             PlaceholderText="C:\Users\...\AppData\Local\Programs\Microsoft VS Code\Code.exe"
+                             Text="{x:Bind ViewModel.ExternalEditorPath, Mode=TwoWay}"/>
+                    <TextBox Header="Аргументы ({file}, {line})"
+                             PlaceholderText="&quot;{file}&quot;"
+                             Text="{x:Bind ViewModel.ExternalEditorArgs, Mode=TwoWay}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="💾 Сохранить"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Command="{x:Bind ViewModel.SaveExternalEditorCommand}"/>
+                        <TextBlock Text="{x:Bind ViewModel.ExternalEditorStatus, Mode=OneWay}"
+                                   VerticalAlignment="Center" Opacity="0.75"/>
                     </StackPanel>
                 </StackPanel>
             </Border>

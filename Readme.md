@@ -21,6 +21,16 @@ The key principle is fully local operation. Everything runs on your computer via
 
 ✅ Гибко — под каждую задачу можно выбрать модель, оптимальную по скорости/качеству/ресурсам.
 
+📚 Документация
+
+Каталог возможностей: [docs/FEATURES.md](docs/FEATURES.md)
+
+Инструкция пользователя: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+
+Актуализация docs: [docs/MAINTENANCE.md](docs/MAINTENANCE.md)
+
+В приложении: вкладка **Справка** (тот же USER_GUIDE / FEATURES).
+
 🎯 Функционал
 
 Мультиагентная архитектура
@@ -124,6 +134,8 @@ GPU: видеокарта 1 ГБ VRAM
 
 
 🚀 Быстрый старт
+
+Подробнее: [docs/USER_GUIDE.md](docs/USER_GUIDE.md) (§1).
 
 Установите .NET 10 SDK и Ollama.
 

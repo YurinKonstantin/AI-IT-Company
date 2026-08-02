@@ -1,6 +1,7 @@
 ﻿using Build;
 using Core.Configuration;
 using Core.Contracts;
+using Core.Services;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -17,6 +18,7 @@ public sealed class BuilderAgent : AgentBase
     public override AgentRole Role => AgentRole.Builder;
     protected override string DefaultSystemPrompt => "Sink-agent, LLM is not actively used.";
     private readonly AppSettingsStore _settings;
+    private readonly PendingChangeService _pending;
 
     private const int MaxNuGetRetries = 3;
 
@@ -25,10 +27,12 @@ public sealed class BuilderAgent : AgentBase
         AgentConfigStore configStore,
         AgentPromptStore promptStore,
         AppSettingsStore settings,
+        PendingChangeService pending,
         ILogger<BuilderAgent> logger)
         : base(factory, configStore, promptStore, logger)
     {
         _settings = settings;
+        _pending = pending;
     }
 
     public override async Task<AgentResult> ExecuteAsync(AgentContext ctx, CancellationToken ct)
@@ -41,19 +45,55 @@ public sealed class BuilderAgent : AgentBase
 
         Logger.LogInformation("[Builder] Рабочая папка: {Path}", outputRoot);
 
+        var prevSink = DotnetRunner.TerminalSink;
+        DotnetRunner.TerminalSink = line =>
+            ctx.RaiseEvent?.Invoke(AgentRole.Builder, "terminal", line);
+
+        try
+        {
+            return await ExecuteCoreAsync(ctx, outputRoot, ct);
+        }
+        finally
+        {
+            DotnetRunner.TerminalSink = prevSink;
+        }
+    }
+
+    private async Task<AgentResult> ExecuteCoreAsync(AgentContext ctx, string outputRoot, CancellationToken ct)
+    {
         // Один бэкап на прогон (важно для цикла FixError ↔ Builder).
         if (ctx.Mode != WorkMode.CreateNew
             && ctx.ProjectPath is not null
             && !ctx.SharedData.ContainsKey("backup_path"))
         {
-            var backupFolder = PathHelper.CreateBackupFolder();
-            var actualBackup = BackupService.Backup(ctx.ProjectPath, backupFolder);
-            ctx.SharedData["backup_path"] = actualBackup;
-            Logger.LogInformation("[Builder] Бэкап: {Path}", actualBackup);
+            try
+            {
+                var backupFolder = PathHelper.CreateBackupFolder();
+                var actualBackup = BackupService.Backup(ctx.ProjectPath, backupFolder);
+                ctx.SharedData["backup_path"] = actualBackup;
+                Logger.LogInformation("[Builder] Бэкап: {Path}", actualBackup);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "[Builder] Бэкап не создан.");
+            }
         }
 
-        int filesWritten = await WriteCoderFilesAsync(ctx, outputRoot, ct);
-        Logger.LogInformation("[Builder] Записано файлов: {Count}", filesWritten);
+        int staged = StageCoderFiles(ctx, outputRoot);
+        Logger.LogInformation("[Builder] Предложено файлов: {Count}", staged);
+        if (staged > 0)
+        {
+            ctx.RaiseEvent?.Invoke(AgentRole.Builder, "pending-change",
+                $"{staged} файл(ов) в очереди изменений. Режим ревью: {_settings.GetReviewChangesMode()}");
+
+            var applied = await _pending.WaitIfNeededAsync(ctx.Mode, ct);
+            if (!applied)
+            {
+                ctx.SharedData["build_ok"] = "false";
+                ctx.SharedData["build_log"] = "Пользователь отклонил предложенные изменения.";
+                return new AgentResult(false, "", "Изменения отклонены (Reject).");
+            }
+        }
 
         var projects = NuGetPackageResolver.FindProjectFiles(outputRoot);
         if (projects.Count == 0)
@@ -178,9 +218,9 @@ public sealed class BuilderAgent : AgentBase
             Error: exitCode == 0 ? null : TrimEnd(stdErr, 2000));
     }
 
-    private async Task<int> WriteCoderFilesAsync(AgentContext ctx, string outputRoot, CancellationToken ct)
+    private int StageCoderFiles(AgentContext ctx, string outputRoot)
     {
-        int filesWritten = 0;
+        int staged = 0;
         var coderMode = _settings.GetCoderMode();
         string[] keys = coderMode == CoderMode.Unified
             ? new[] { "fullstack_code", "game_code", "tests_code", "fix_code" }
@@ -193,27 +233,29 @@ public sealed class BuilderAgent : AgentBase
             foreach (var b in CodeExtractor.Extract(blob))
             {
                 if (b.Path is null) continue;
-                if (!FileWriteGuard.TryResolve(outputRoot, b.Path, out var full, out var deny))
+                if (!FileWriteGuard.TryResolve(outputRoot, b.Path, out _, out var deny))
                 {
                     Logger.LogWarning("[Builder] Запись отклонена ({Path}): {Reason}", b.Path, deny);
                     continue;
                 }
 
-                var dir = Path.GetDirectoryName(full);
-                if (!string.IsNullOrEmpty(dir)) PathHelper.EnsureDirectory(dir);
-
-                if (b.IsDiff && b.Path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) && File.Exists(full))
+                try
                 {
-                    await CsprojDiffApplier.ApplyAsync(full, b.Code, ct);
+                    bool isCsprojDiff = b.IsDiff
+                        && b.Path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase);
+                    _pending.Stage(outputRoot, b.Path, b.Code, key, isCsprojDiff);
+                    staged++;
                 }
-                else
+                catch (Exception ex)
                 {
-                    await File.WriteAllTextAsync(full, b.Code, ct);
+                    Logger.LogWarning(ex, "[Builder] Не удалось поставить в очередь {Path}", b.Path);
                 }
-                filesWritten++;
             }
+
+            // После постановки в очередь очищаем blob, чтобы не дублировать на следующем Builder.
+            ctx.SharedData.Remove(key);
         }
-        return filesWritten;
+        return staged;
     }
 
     /// <summary>

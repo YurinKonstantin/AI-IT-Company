@@ -3,8 +3,9 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:muxc="using:Microsoft.UI.Xaml.Controls">
 
-    <Grid Padding="16" RowSpacing="12">
+    <Grid Padding="16" RowSpacing="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -13,41 +14,70 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Заголовок -->
         <TextBlock Text="💬 Чат с AI IT-Company"
                    Style="{ThemeResource TitleTextBlockStyle}"/>
 
-        <!-- Режим -->
-        <ComboBox Grid.Row="1"
-                  Header="Режим работы"
-                  MinWidth="320"
-                  SelectedIndex="{x:Bind ViewModel.ModeIndex, Mode=TwoWay}">
-            <x:String>Создать новый</x:String>
-            <x:String>Улучшить существующий</x:String>
-            <x:String>Исправить ошибку</x:String>
-            <x:String>Задокументировать</x:String>
-            <x:String>Проанализировать</x:String>
-        </ComboBox>
+        <StackPanel Grid.Row="1" Spacing="6">
+            <ComboBox Header="Режим работы"
+                      MinWidth="360"
+                      ToolTipService.ToolTip="{x:Bind ViewModel.ModeHint, Mode=OneWay}"
+                      SelectedIndex="{x:Bind ViewModel.ModeIndex, Mode=TwoWay}">
+                <x:String>Авто (определит Interpreter)</x:String>
+                <x:String>Создать новый</x:String>
+                <x:String>Улучшить существующий</x:String>
+                <x:String>Исправить ошибку</x:String>
+                <x:String>Задокументировать</x:String>
+                <x:String>Проанализировать</x:String>
+                <x:String>Только ТЗ / архитектура</x:String>
+            </ComboBox>
+            <TextBlock Text="{x:Bind ViewModel.ModeHint, Mode=OneWay}"
+                       Opacity="0.75" TextWrapping="Wrap"/>
+            <muxc:InfoBar IsOpen="{x:Bind ViewModel.NeedsProjectFolder, Mode=OneWay}"
+                          Severity="Informational"
+                          IsClosable="False"
+                          Title="Нужна папка проекта"
+                          Message="Укажите путь ниже (Обзор…) — без папки режим Improve / Fix / Document / Analyze не стартует."/>
+        </StackPanel>
 
-        <!-- Путь к проекту -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
-            <TextBox PlaceholderText="Путь к существующему проекту (Improve / Fix / Document / Analyze)"
+            <TextBox PlaceholderText="Путь к проекту (нужен для Improve / Fix / Document / Analyze; в Авто — если задача про существующий код)"
                      Width="520"
                      Text="{x:Bind ViewModel.ProjectPath, Mode=TwoWay}"/>
             <Button Content="📁 Обзор..." Command="{x:Bind ViewModel.PickFolderCommand}"/>
         </StackPanel>
 
-        <!-- Ввод промпта -->
-        <TextBox Grid.Row="3"
+        <!-- @file / @folder -->
+        <StackPanel Grid.Row="3" Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Контекст" VerticalAlignment="Center" Opacity="0.8"/>
+                <Button Content="@file" Command="{x:Bind ViewModel.AttachFileCommand}"/>
+                <Button Content="@folder" Command="{x:Bind ViewModel.AttachFolderCommand}"/>
+                <Button Content="Очистить" Command="{x:Bind ViewModel.ClearAttachmentsCommand}"/>
+                <TextBlock Opacity="0.55" VerticalAlignment="Center"
+                           Text="или в тексте: @file path · @folder path"/>
+            </StackPanel>
+            <ItemsRepeater ItemsSource="{x:Bind ViewModel.Attachments, Mode=OneWay}">
+                <ItemsRepeater.Layout>
+                    <StackLayout Orientation="Horizontal" Spacing="6"/>
+                </ItemsRepeater.Layout>
+                <DataTemplate>
+                    <Border Padding="8,4" CornerRadius="6"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <TextBlock Text="{Binding Label}" FontFamily="Consolas" FontSize="12"
+                                   ToolTipService.ToolTip="{Binding Path}"/>
+                    </Border>
+                </DataTemplate>
+            </ItemsRepeater>
+        </StackPanel>
+
+        <TextBox Grid.Row="4"
                  AcceptsReturn="True"
-                 MinHeight="120"
+                 MinHeight="110"
                  Header="Задача"
-                 PlaceholderText="Опишите, что нужно сделать..."
+                 PlaceholderText="Опишите, что нужно сделать... Можно @file D:\proj\App.xaml"
                  Text="{x:Bind ViewModel.Prompt, Mode=TwoWay}"/>
 
-        <!-- Панель управления запуском + текущий проект -->
-        <!-- Панель управления запуском + текущий проект -->
-        <Grid Grid.Row="4" ColumnSpacing="8">
+        <Grid Grid.Row="5" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
@@ -102,8 +132,7 @@
             </muxc:InfoBar>
         </Grid>
 
-        <!-- Лента событий (теперь показывает Icon + Role + Payload) -->
-        <Border Grid.Row="5" BorderThickness="1"
+        <Border Grid.Row="6" BorderThickness="1"
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         CornerRadius="8" Padding="8">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
