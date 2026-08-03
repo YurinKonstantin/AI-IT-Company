@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="App_Brand.Text" xml:space="preserve"><value>AI IT-Company</value></data>
+  <data name="Nav_Agent.Content" xml:space="preserve"><value>Studio</value></data>
+  <data name="Nav_Review.Content" xml:space="preserve"><value>Review</value></data>
+  <data name="Nav_Runs.Content" xml:space="preserve"><value>Runs</value></data>
+  <data name="Nav_AgentsModels.Content" xml:space="preserve"><value>Agents &amp; Models</value></data>
+  <data name="Nav_More.Content" xml:space="preserve"><value>More</value></data>
+  <data name="Nav_Freelance.Content" xml:space="preserve"><value>Autopilot</value></data>
+  <data name="Nav_Logs.Content" xml:space="preserve"><value>Logs</value></data>
+  <data name="Nav_Help.Content" xml:space="preserve"><value>Help</value></data>
+  <data name="Nav_Settings.Content" xml:space="preserve"><value>Settings</value></data>
+  <data name="Agent_Title.Text" xml:space="preserve"><value>Studio</value></data>
+  <data name="Studio_Banner.Text" xml:space="preserve"><value>Studio — describe an idea; agents implement. Review Apply/Reject when asked.</value></data>
+  <data name="Autopilot_Title.Text" xml:space="preserve"><value>Autopilot (freelance + GitHub bounties)</value></data>
+  <data name="Autopilot_Banner.Text" xml:space="preserve"><value>Autopilot — hunt &amp; score jobs; Accept starts the internal pipeline only (no marketplace bid).</value></data>
+  <data name="Agent_ClearTimeline.Content" xml:space="preserve"><value>Clear</value></data>
+  <data name="Agent_Side_Run.Text" xml:space="preserve"><value>Run</value></data>
+  <data name="Agent_Side_Progress.Text" xml:space="preserve"><value>Progress</value></data>
+  <data name="Agent_OpenFolder.Content" xml:space="preserve"><value>Folder</value></data>
+  <data name="Agent_RetryStage.Content" xml:space="preserve"><value>Retry stage</value></data>
+  <data name="Agent_BuildFix_Title.Text" xml:space="preserve"><value>Build not fixed</value></data>
+  <data name="Agent_BuildFix_Rollback.Content" xml:space="preserve"><value>Rollback</value></data>
+  <data name="Agent_BuildFix_Continue.Content" xml:space="preserve"><value>Fixed — continue</value></data>
+  <data name="Agent_BuildFix_Proceed.Content" xml:space="preserve"><value>Continue with error</value></data>
+  <data name="Agent_OpenReview.Text" xml:space="preserve"><value>Review changes</value></data>
+  <data name="Agent_Browse.Content" xml:space="preserve"><value>Browse…</value></data>
+  <data name="Agent_ClearAttach.Content" xml:space="preserve"><value>Clear</value></data>
+  <data name="Agent_Prompt.PlaceholderText" xml:space="preserve"><value>Describe the task… (@file path / @folder path)</value></data>
+  <data name="Agent_ProjectPath.PlaceholderText" xml:space="preserve"><value>Project folder</value></data>
+  <data name="Agent_Send.Content" xml:space="preserve"><value>Send</value></data>
+  <data name="Agent_Stop.Content" xml:space="preserve"><value>Stop</value></data>
+  <data name="Runs_Title.Text" xml:space="preserve"><value>Runs</value></data>
+  <data name="Runs_Subtitle.Text" xml:space="preserve"><value>Session history. Live progress is on the Agent page.</value></data>
+  <data name="Runs_OpenAgent.Content" xml:space="preserve"><value>Open Agent</value></data>
+  <data name="Runs_History.Text" xml:space="preserve"><value>History</value></data>
+  <data name="Runs_Refresh.Content" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Lab_Tab_Agents.Header" xml:space="preserve"><value>Agents</value></data>
+  <data name="Lab_Tab_Models.Header" xml:space="preserve"><value>Models</value></data>
+  <data name="Settings_Title.Text" xml:space="preserve"><value>Settings</value></data>
+  <data name="Settings_Tab_Providers.Header" xml:space="preserve"><value>Providers</value></data>
+  <data name="Settings_Tab_Pipeline.Header" xml:space="preserve"><value>Pipeline</value></data>
+  <data name="Settings_Tab_Language.Header" xml:space="preserve"><value>Language</value></data>
+  <data name="Settings_Tab_Editor.Header" xml:space="preserve"><value>Editor</value></data>
+  <data name="Settings_Tab_Freelance.Header" xml:space="preserve"><value>Freelance</value></data>
+  <data name="Settings_Tab_Artist.Header" xml:space="preserve"><value>Artist</value></data>
+  <data name="Settings_Tab_Templates.Header" xml:space="preserve"><value>Templates</value></data>
+  <data name="Settings_Tab_Prompts.Header" xml:space="preserve"><value>Prompts</value></data>
+  <data name="Review_Title.Text" xml:space="preserve"><value>Review (Apply / Reject)</value></data>
+  <data name="ModeHint_Auto" xml:space="preserve"><value>Auto: Interpreter picks the mode. Folder needed for existing-code tasks.</value></data>
+  <data name="ModeHint_Create" xml:space="preserve"><value>Create a new project. Folder optional — output goes to Output.</value></data>
+  <data name="ModeHint_Improve" xml:space="preserve"><value>Improve: select an existing project folder. Review diffs on Review.</value></data>
+  <data name="ModeHint_Fix" xml:space="preserve"><value>Fix error: select project folder. Check build log on failure.</value></data>
+  <data name="ModeHint_Document" xml:space="preserve"><value>Document: select folder. Writes README / ARCHITECTURE without rewriting code.</value></data>
+  <data name="ModeHint_Analyze" xml:space="preserve"><value>Analyze: select folder. Result is ANALYSIS.md without code edits.</value></data>
+  <data name="ModeHint_Plan" xml:space="preserve"><value>Plan only: no code generation — TZ.md and architecture plan.</value></data>
+  <data name="Timeline_You" xml:space="preserve"><value>You</value></data>
+  <data name="Settings_UiLanguageSaved" xml:space="preserve"><value>UI language saved. Restart the app to refresh all chrome strings.</value></data>
+</root>

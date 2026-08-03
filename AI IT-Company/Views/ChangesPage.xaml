@@ -9,29 +9,61 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Изменения (Apply / Reject)"
+        <TextBlock x:Uid="Review_Title"
+                   Text="Review (Apply / Reject)"
                    Style="{ThemeResource TitleTextBlockStyle}"/>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
-            <Button Content="✅ Apply selected"
+        <muxc:InfoBar Grid.Row="1"
+                      IsOpen="{x:Bind ViewModel.AwaitingDecision, Mode=OneWay}"
+                      IsClosable="False"
+                      Severity="Warning"
+                      Title="Pipeline paused"
+                      Message="Apply or Reject changes to continue the run."/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
+            <Button Content="Apply selected"
                     Style="{ThemeResource AccentButtonStyle}"
                     Command="{x:Bind ViewModel.ApplySelectedCommand}"/>
-            <Button Content="✅ Apply all"
+            <Button Content="Apply all"
                     Command="{x:Bind ViewModel.ApplyAllCommand}"/>
-            <Button Content="✖ Reject all"
+            <Button Content="Reject selected"
+                    Command="{x:Bind ViewModel.RejectSelectedCommand}"/>
+            <Button Content="Reject all"
                     Command="{x:Bind ViewModel.RejectAllCommand}"/>
-            <Button Content="📝 В редакторе"
+            <Button Content="Open in editor"
                     Command="{x:Bind ViewModel.OpenInEditorCommand}"/>
-            <Button Content="🗑 Очистить"
+            <Button Content="Clear"
                     Command="{x:Bind ViewModel.ClearHistoryCommand}"/>
             <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
                        VerticalAlignment="Center" Opacity="0.8" Margin="12,0,0,0"/>
         </StackPanel>
 
-        <Grid Grid.Row="2" ColumnSpacing="12">
+        <Border Grid.Row="3" Padding="12" CornerRadius="8" Margin="0,0,0,4"
+                Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                Visibility="{x:Bind ViewModel.ShowTeachAfterReject, Mode=OneWay}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Teach from reject (optional)" FontWeight="SemiBold"/>
+                <TextBox Header="What was wrong"
+                         Text="{x:Bind ViewModel.RejectTeachWrong, Mode=TwoWay}"/>
+                <TextBox Header="How it should be done"
+                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56"
+                         Text="{x:Bind ViewModel.RejectTeachRight, Mode=TwoWay}"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Save lesson" Style="{ThemeResource AccentButtonStyle}"
+                            Command="{x:Bind ViewModel.SaveRejectTeachCommand}"/>
+                    <Button Content="Skip" Command="{x:Bind ViewModel.SkipRejectTeachCommand}"/>
+                    <TextBlock Text="{x:Bind ViewModel.RejectTeachStatus, Mode=OneWay}"
+                               VerticalAlignment="Center" Opacity="0.8"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="4" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1.1*"/>
                 <ColumnDefinition Width="1.4*"/>

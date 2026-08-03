@@ -16,6 +16,8 @@ public partial class AgentConfigItem : ObservableObject
 {
     public AgentRole Role { get; }
     public string DisplayName { get; }
+    public string RecommendedHint { get; }
+    public string RoleTier { get; }
 
     [ObservableProperty] private string source = "Ollama";
     [ObservableProperty] private string modelName = "";
@@ -33,6 +35,8 @@ public partial class AgentConfigItem : ObservableObject
     {
         Role = role;
         DisplayName = RoleToRussian(role);
+        RoleTier = RoleToTier(role);
+        RecommendedHint = AgentConfigStore.GetRecommendedHint(role);
         Apply(s);
         // Помечаем dirty при любых изменениях.
         PropertyChanged += (_, e) =>
@@ -61,6 +65,17 @@ public partial class AgentConfigItem : ObservableObject
         MaxTokens = MaxTokens,
         Temperature = Temperature,
         ContextWindow = ContextWindow
+    };
+
+    private static string RoleToTier(AgentRole r) => r switch
+    {
+        AgentRole.ErrorFixer => "Fixer",
+        AgentRole.BackendCoder or AgentRole.FrontendCoder or AgentRole.FullstackCoder
+            or AgentRole.GameCoder or AgentRole.Tester => "Coder",
+        AgentRole.Architect => "Architect",
+        AgentRole.Documenter or AgentRole.Analyst or AgentRole.UxReviewer => "Docs",
+        AgentRole.Builder or AgentRole.Scaffolder => "Tools",
+        _ => "Light"
     };
 
     private static string RoleToRussian(AgentRole r) => r switch
@@ -148,7 +163,7 @@ public partial class AgentsConfigViewModel : ObservableObject
     {
         await _store.ApplyPresetAsync("compact");
         Reload();
-        GlobalStatus = "✅ Пресет Compact (7b / лёгкие модели) применён";
+        GlobalStatus = "✅ Пресет Compact (Fixer/Coder/Docs · 7b/3b, ужатый ctx) применён";
     }
 
     [RelayCommand]
@@ -156,6 +171,6 @@ public partial class AgentsConfigViewModel : ObservableObject
     {
         await _store.ApplyPresetAsync("balanced");
         Reload();
-        GlobalStatus = "✅ Пресет Balanced (14b на ключевых ролях) применён";
+        GlobalStatus = "✅ Пресет Balanced (14b кодеры/fixer, 8b docs) применён";
     }
 }

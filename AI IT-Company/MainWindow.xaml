@@ -12,12 +12,34 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Titlebar (кастомная, чтобы NavigationView занял всю высоту) -->
-        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="36" Background="Transparent">
-            <TextBlock Text="🤖 AI IT-Company"
-                       VerticalAlignment="Center"
-                       Margin="16,0,0,0"
-                       FontWeight="SemiBold"/>
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="40" Background="Transparent">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="16,0,0,0" VerticalAlignment="Center">
+                <TextBlock x:Uid="App_Brand"
+                           Text="AI IT-Company"
+                           FontWeight="SemiBold"
+                           FontSize="14"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Product mode: Studio vs Autopilot -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4"
+                        Margin="0,0,140,0" VerticalAlignment="Center">
+                <Button x:Name="StudioModeBtn"
+                        Content="Studio"
+                        Padding="12,4"
+                        Click="StudioMode_Click"
+                        ToolTipService.ToolTip="Studio — vibe coding / manual pipeline"/>
+                <Button x:Name="AutopilotModeBtn"
+                        Content="Autopilot"
+                        Padding="12,4"
+                        Click="AutopilotMode_Click"
+                        ToolTipService.ToolTip="Autopilot — freelance hunt &amp; auto-accept"/>
+            </StackPanel>
         </Grid>
 
         <muxc:NavigationView
@@ -26,26 +48,51 @@
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
             PaneDisplayMode="Left"
-            OpenPaneLength="220"
+            OpenPaneLength="200"
+            CompactPaneLength="48"
+            IsPaneOpen="True"
+            IsEnabled="False"
             SelectionChanged="NavView_SelectionChanged"
             Loaded="NavView_Loaded">
 
             <muxc:NavigationView.MenuItems>
-                <muxc:NavigationViewItem Content="Чат"         Tag="chat"      Icon="Message"/>
-                <muxc:NavigationViewItem Content="Дашборд"     Tag="dashboard" Icon="Home"/>
-                <muxc:NavigationViewItem Content="Изменения"   Tag="changes"   Icon="Edit"/>
-                <muxc:NavigationViewItem Content="Фриланс"     Tag="freelance" Icon="Shop"/>
-                <muxc:NavigationViewItem Content="Агенты"      Tag="agents"    Icon="People"/>
-                <muxc:NavigationViewItem Content="Модели"      Tag="models"    Icon="Download"/>
-                <muxc:NavigationViewItem Content="Логи"        Tag="logs"      Icon="Document"/>
-                <muxc:NavigationViewItem Content="Справка"     Tag="help"      Icon="Help"/>
+                <muxc:NavigationViewItem x:Name="NavStudioItem" x:Uid="Nav_Agent" Content="Studio" Tag="chat" Icon="Message"/>
+                <muxc:NavigationViewItem x:Name="NavAutopilotItem" x:Uid="Nav_Freelance" Content="Autopilot" Tag="freelance" Icon="Shop"/>
+                <muxc:NavigationViewItem x:Name="NavReviewItem" x:Uid="Nav_Review" Content="Review" Tag="changes" Icon="Edit">
+                    <muxc:NavigationViewItem.InfoBadge>
+                        <muxc:InfoBadge x:Name="ReviewBadge" Value="0" Visibility="Collapsed"/>
+                    </muxc:NavigationViewItem.InfoBadge>
+                </muxc:NavigationViewItem>
+                <muxc:NavigationViewItem x:Uid="Nav_Runs" Content="Runs" Tag="dashboard" Icon="Clock"/>
+                <muxc:NavigationViewItem x:Uid="Nav_AgentsModels" Content="Agents &amp; Models" Tag="agents" Icon="People"/>
+                <muxc:NavigationViewItem x:Uid="Nav_More" Content="More" SelectsOnInvoked="False" Icon="More">
+                    <muxc:NavigationViewItem.MenuItems>
+                        <muxc:NavigationViewItem x:Uid="Nav_Logs" Content="Logs" Tag="logs" Icon="Document"/>
+                        <muxc:NavigationViewItem x:Uid="Nav_Help" Content="Help" Tag="help" Icon="Help"/>
+                    </muxc:NavigationViewItem.MenuItems>
+                </muxc:NavigationViewItem>
             </muxc:NavigationView.MenuItems>
 
             <muxc:NavigationView.FooterMenuItems>
-                <muxc:NavigationViewItem Content="Настройки" Tag="settings" Icon="Setting"/>
+                <muxc:NavigationViewItem x:Uid="Nav_Settings" Content="Settings" Tag="settings" Icon="Setting"/>
             </muxc:NavigationView.FooterMenuItems>
 
             <Frame x:Name="ContentFrame"/>
         </muxc:NavigationView>
+
+        <!-- Shown until stores finish initializing after first Activate. -->
+        <Grid x:Name="StartupOverlay"
+              Grid.Row="0" Grid.RowSpan="2"
+              Background="{ThemeResource LayerFillColorDefaultBrush}"
+              Canvas.ZIndex="100">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
+                <ProgressRing IsActive="True" Width="48" Height="48"/>
+                <TextBlock x:Name="StartupStatusText"
+                           Text="Loading…"
+                           HorizontalAlignment="Center"
+                           FontSize="16"
+                           Opacity="0.8"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

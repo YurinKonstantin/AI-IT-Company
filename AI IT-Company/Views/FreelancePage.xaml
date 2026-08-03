@@ -14,8 +14,14 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Биржа (фриланс + GitHub bounties)"
-                   Style="{ThemeResource TitleTextBlockStyle}"/>
+        <StackPanel Grid.Row="0" Spacing="4">
+            <TextBlock x:Uid="Autopilot_Title"
+                       Text="Autopilot (freelance + GitHub bounties)"
+                       Style="{ThemeResource TitleTextBlockStyle}"/>
+            <TextBlock x:Uid="Autopilot_Banner"
+                       Text="Autopilot — hunt &amp; score jobs; Accept starts the internal pipeline only (no marketplace bid)."
+                       Opacity="0.65" FontSize="12" TextWrapping="Wrap"/>
+        </StackPanel>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
             <Button Content="🔎 Охота"

@@ -11,6 +11,7 @@ namespace Core.Agents
         public int TimeoutSeconds { get; set; } = 0;
         public int MaxTokens { get; set; } = 0;
         public double Temperature { get; set; } = 0.7;
-        public int ContextWindow { get; set; } = 128_000;
+        /// <summary>Default 8k — 128k num_ctx commonly OOMs local Ollama models.</summary>
+        public int ContextWindow { get; set; } = 8_192;
     }
 }

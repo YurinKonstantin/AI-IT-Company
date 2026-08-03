@@ -88,8 +88,11 @@ public sealed class ArchitectAgent : AgentBase
 """;
 
     public ArchitectAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore, ITranslationService translator,
+                          CorrectionLessonStore lessons, AppSettingsStore appSettings,
+                          IWebSearchService webSearch,
                           ILogger<ArchitectAgent> logger)
-        : base(factory, configStore, promptStore, translator, logger) { _translator = translator; }
+        : base(factory, configStore, promptStore, translator, logger, lessons, appSettings, webSearch)
+    { _translator = translator; }
 
     protected override string BuildUserPrompt(AgentContext ctx)
     {

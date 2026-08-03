@@ -24,6 +24,7 @@ public static class PathHelper
     public static string OutputRoot { get; } = Init(Path.Combine(AppRoot, "Output"));
     public static string BackupRoot { get; } = Init(Path.Combine(AppRoot, "Backup"));
     public static string LogsRoot { get; } = Init(Path.Combine(AppRoot, "Logs"));
+    public static string LearningRoot { get; } = Init(Path.Combine(AppRoot, "Learning"));
     public static string ModelsRoot { get; } = Init(Path.Combine(AppRoot, "Models"));
     public static string DatabasePath { get; } = Path.Combine(AppRoot, "aiitcompany.db");
 

@@ -1,5 +1,6 @@
 ﻿using Core.Configuration;
 using Core.Contracts;
+using Core.Services;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -26,7 +27,9 @@ namespace Core.Agents
 No explanations outside the blocks.
 """;
         public BackendCoderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
-                        ILogger<InterpreterAgent> logger) : base(factory, configStore, promptStore,  logger) { }
+                        CorrectionLessonStore lessons, AppSettingsStore appSettings,
+                        ILogger<InterpreterAgent> logger)
+            : base(factory, configStore, promptStore, logger, lessons, appSettings) { }
         protected override string BuildUserPrompt(AgentContext ctx)
         {
             var role = ctx.Type == ProjectType.WindowsService

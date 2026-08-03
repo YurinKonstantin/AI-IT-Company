@@ -13,6 +13,11 @@ namespace Ai;
 
 public sealed class OllamaProvider : IAiProvider, IDisposable
 {
+    /// <summary>Hard cap — large num_ctx OOMs small local models (HTTP 500).</summary>
+    public const int MaxNumCtx = 16_384;
+    public const int DefaultNumCtx = 8_192;
+    public const int DefaultNumPredict = 4_096;
+
     private HttpClient _http;
     private readonly object _httpLock = new();
 
@@ -53,6 +58,9 @@ public sealed class OllamaProvider : IAiProvider, IDisposable
         AiRequest request, [EnumeratorCancellation] CancellationToken ct = default)
     {
         var http = SnapshotHttp();
+        var numCtx = ClampCtx(request.ContextWindow);
+        var numPredict = request.MaxTokens <= 0 ? DefaultNumPredict : request.MaxTokens;
+
         var body = new
         {
             model = request.ModelName,
@@ -62,15 +70,22 @@ public sealed class OllamaProvider : IAiProvider, IDisposable
             options = new
             {
                 temperature = request.Temperature,
-                num_ctx = request.ContextWindow,
-                num_predict = request.MaxTokens == 0 ? -1 : request.MaxTokens
+                num_ctx = numCtx,
+                num_predict = numPredict
             }
         };
 
         using var req = new HttpRequestMessage(HttpMethod.Post, "/api/generate")
         { Content = JsonContent.Create(body) };
         using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
-        resp.EnsureSuccessStatusCode();
+        if (!resp.IsSuccessStatusCode)
+        {
+            var errBody = "";
+            try { errBody = await resp.Content.ReadAsStringAsync(ct); } catch { /* ignore */ }
+            var detail = Truncate(errBody, 500);
+            throw new HttpRequestException(
+                $"Ollama HTTP {(int)resp.StatusCode} ({resp.ReasonPhrase}): {detail}");
+        }
 
         using var stream = await resp.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream);
@@ -87,6 +102,12 @@ public sealed class OllamaProvider : IAiProvider, IDisposable
 
     public void Dispose() => _http.Dispose();
 
+    internal static int ClampCtx(int requested)
+    {
+        if (requested <= 0) return DefaultNumCtx;
+        return Math.Min(requested, MaxNumCtx);
+    }
+
     private HttpClient SnapshotHttp()
     {
         lock (_httpLock) return _http;
@@ -94,6 +115,9 @@ public sealed class OllamaProvider : IAiProvider, IDisposable
 
     private static string Normalize(string baseUrl)
         => (baseUrl ?? "").Trim().TrimEnd('/');
+
+    private static string Truncate(string s, int max)
+        => string.IsNullOrEmpty(s) ? "(empty)" : s.Length <= max ? s : s[..max] + "…";
 
     private static HttpClient Create(string url) => new()
     {

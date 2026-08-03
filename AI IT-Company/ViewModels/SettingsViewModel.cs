@@ -2,12 +2,18 @@
 using Build;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Core;
 using Core.Configuration;
 using Core.Contracts;
+using Core.Services;
+using Data;
 using Microsoft.UI.Dispatching;
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -25,6 +31,7 @@ namespace AI_IT_Company.ViewModels
         private readonly OnnxProvider _onnxProvider;
         private readonly WindowsCredentialStore _credentials;
         private readonly AgentPromptStore _promptStore;
+        private readonly CorrectionLessonStore _lessons;
         private readonly DispatcherQueue _ui;
 
         public string[] CoderModeOptions { get; } =
@@ -44,6 +51,30 @@ namespace AI_IT_Company.ViewModels
             { "English", "Russian", "Chinese", "Spanish", "German", "French",
       "Portuguese", "Japanese", "Korean", "Italian", "Ukrainian", "Polish" };
 
+        public string[] UiLanguageOptions { get; } =
+        {
+            "English (en-US)",
+            "Русский (ru-RU)",
+            "简体中文 (zh-Hans)"
+        };
+
+        [ObservableProperty] private int uiLanguageIndex;
+        [ObservableProperty] private string uiLanguageStatus = "";
+
+        [RelayCommand]
+        private async Task SaveUiLanguageAsync()
+        {
+            var tag = UiLanguageIndex switch
+            {
+                1 => "ru-RU",
+                2 => "zh-Hans",
+                _ => "en-US"
+            };
+            await _settings.SetUiLanguageAsync(tag);
+            Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = tag;
+            UiLanguageStatus = AI_IT_Company.Loc.Get("Settings_UiLanguageSaved", $"UI language: {tag}. Restart may be required for all strings.");
+        }
+
         [RelayCommand]
         private async Task SaveTranslationAsync()
         {
@@ -52,7 +83,7 @@ namespace AI_IT_Company.ViewModels
             await _settings.SetWorkingLanguageAsync(WorkingLanguage);
             TranslationStatus = TranslationEnabled
                 ? $"✅ {UserLanguage} ↔ {WorkingLanguage}"
-                : "⏸ Перевод отключён";
+                : "⏸ Translation off";
         }
 
         [ObservableProperty] private int coderModeIndex;
@@ -89,6 +120,15 @@ namespace AI_IT_Company.ViewModels
         [ObservableProperty] private string openRouterStatus = "";
         [ObservableProperty] private bool isOpenRouterOk;
 
+        // --- Web search ---
+        public string[] WebSearchProviderOptions { get; } = { "Tavily", "Brave" };
+        [ObservableProperty] private bool webSearchEnabled;
+        [ObservableProperty] private int webSearchProviderIndex;
+        [ObservableProperty] private string webSearchMaxSnippetsText = "3";
+        [ObservableProperty] private string webSearchBudgetCharsText = "1500";
+        [ObservableProperty] private string webSearchApiKeyInput = "";
+        [ObservableProperty] private string webSearchStatus = "";
+
         // --- LM Studio ---
         [ObservableProperty] private string lmStudioUrl = "";
         [ObservableProperty] private string lmStudioStatus = "";
@@ -116,11 +156,33 @@ namespace AI_IT_Company.ViewModels
             "Never — авто-применение"
         };
 
+        public string[] ProductModeOptions { get; } =
+        {
+            "Studio — vibe / Agent",
+            "Autopilot — freelance hunt"
+        };
+
         [ObservableProperty] private int reviewChangesModeIndex;
         [ObservableProperty] private string reviewChangesStatus = "";
+        [ObservableProperty] private int productModeIndex;
+        [ObservableProperty] private string productModeStatus = "";
         [ObservableProperty] private string externalEditorPath = "";
         [ObservableProperty] private string externalEditorArgs = "";
         [ObservableProperty] private string externalEditorStatus = "";
+
+        // --- Сборка / авто-фикс ---
+        [ObservableProperty] private string maxBuildFixAttemptsText = "3";
+        [ObservableProperty] private bool askUserOnBuildFixExhausted = true;
+        [ObservableProperty] private string buildFixPolicyStatus = "";
+
+        // --- Learning / correction memory ---
+        [ObservableProperty] private bool correctionLessonsEnabled = true;
+        [ObservableProperty] private string maxCorrectionLessonsText = "6";
+        [ObservableProperty] private string learningPolicyStatus = "";
+        [ObservableProperty] private string learnedModelBase = "qwen2.5-coder:7b";
+        [ObservableProperty] private string learnedModelName = "aiit-learned";
+        [ObservableProperty] private string learningExportStatus = "";
+        public ObservableCollection<LessonItemVm> Lessons { get; } = new();
 
         // --- Freelance ---
         [ObservableProperty] private string freelanceSkills = "";
@@ -132,6 +194,7 @@ namespace AI_IT_Company.ViewModels
         [ObservableProperty] private bool freelanceEnableFlRu;
         [ObservableProperty] private bool freelanceEnableKwork;
         [ObservableProperty] private bool freelanceAutoAccept;
+        [ObservableProperty] private bool freelanceGitHubDraftComment;
         [ObservableProperty] private bool freelanceSimulationOnly;
         [ObservableProperty] private string freelanceAutoAcceptThreshold = "75";
         [ObservableProperty] private string freelanceMinProfit = "50";
@@ -149,7 +212,8 @@ namespace AI_IT_Company.ViewModels
             LmStudioProvider lmStudioProvider,
             OnnxProvider onnxProvider,
             WindowsCredentialStore credentials,
-            AgentPromptStore promptStore)
+            AgentPromptStore promptStore,
+            CorrectionLessonStore lessons)
         {
             _settings = settings;
             _client = client;
@@ -159,6 +223,7 @@ namespace AI_IT_Company.ViewModels
             _onnxProvider = onnxProvider;
             _credentials = credentials;
             _promptStore = promptStore;
+            _lessons = lessons;
             _ui = DispatcherQueue.GetForCurrentThread()
                   ?? throw new InvalidOperationException("UI-поток нужен.");
 
@@ -182,14 +247,25 @@ namespace AI_IT_Company.ViewModels
             TranslationEnabled = _settings.GetTranslationEnabled();
             UserLanguage = _settings.GetUserLanguage();
             WorkingLanguage = _settings.GetWorkingLanguage();
+            UiLanguageIndex = _settings.GetUiLanguage() switch
+            {
+                "ru-RU" => 1,
+                "zh-Hans" => 2,
+                _ => 0
+            };
             ReviewChangesModeIndex = _settings.GetReviewChangesMode().Trim().ToLowerInvariant() switch
             {
                 "always" => 1,
                 "never" or "off" => 2,
                 _ => 0
             };
+            ProductModeIndex = _settings.IsAutopilotMode() ? 1 : 0;
             ExternalEditorPath = _settings.GetExternalEditorPath();
             ExternalEditorArgs = _settings.GetExternalEditorArgs();
+            MaxBuildFixAttemptsText = _settings.GetMaxBuildFixAttempts().ToString();
+            AskUserOnBuildFixExhausted = _settings.GetAskUserOnBuildFixExhausted();
+            CorrectionLessonsEnabled = _settings.GetCorrectionLessonsEnabled();
+            MaxCorrectionLessonsText = _settings.GetMaxCorrectionLessonsInPrompt().ToString();
             FreelanceSkills = _settings.Get(AppSettingsStore.KeyFreelanceSkills, AppSettingsStore.KeyFreelanceSkillsDefault);
             FreelanceHourlyRate = _settings.Get(AppSettingsStore.KeyFreelanceHourlyRate, AppSettingsStore.KeyFreelanceHourlyRateDefault);
             FreelanceKeywords = _settings.Get(AppSettingsStore.KeyFreelanceKeywords, AppSettingsStore.KeyFreelanceKeywordsDefault);
@@ -199,16 +275,23 @@ namespace AI_IT_Company.ViewModels
             FreelanceEnableFlRu = bool.TryParse(_settings.Get(AppSettingsStore.KeyFreelanceEnableFlRu, "false"), out var f) && f;
             FreelanceEnableKwork = bool.TryParse(_settings.Get(AppSettingsStore.KeyFreelanceEnableKwork, "false"), out var k) && k;
             FreelanceAutoAccept = bool.TryParse(_settings.Get(AppSettingsStore.KeyFreelanceAutoAccept, "false"), out var a) && a;
+            FreelanceGitHubDraftComment = _settings.GetFreelanceGitHubDraftComment();
             FreelanceSimulationOnly = bool.TryParse(_settings.Get(AppSettingsStore.KeyFreelanceSimulationOnly, "false"), out var sim) && sim;
             FreelanceAutoAcceptThreshold = _settings.Get(AppSettingsStore.KeyFreelanceAutoAcceptThreshold, AppSettingsStore.KeyFreelanceAutoAcceptThresholdDefault);
             FreelanceMinProfit = _settings.Get(AppSettingsStore.KeyFreelanceMinProfit, AppSettingsStore.KeyFreelanceMinProfitDefault);
             FreelanceFlRuFeedUrl = _settings.Get(Ai.Freelance.FlRuMarketplaceAdapter.FeedUrlKey, "");
             FreelanceKworkFeedUrl = _settings.Get(Ai.Freelance.KworkMarketplaceAdapter.FeedUrlKey, "");
             HasGitHubPat = _credentials.HasSecret(WindowsCredentialStore.GitHubPatResource);
+            WebSearchEnabled = _settings.GetWebSearchEnabled();
+            WebSearchProviderIndex = _settings.GetWebSearchProvider() == "Brave" ? 1 : 0;
+            WebSearchMaxSnippetsText = _settings.GetWebSearchMaxSnippets().ToString();
+            WebSearchBudgetCharsText = _settings.GetWebSearchBudgetChars().ToString();
+            WebSearchStatus = DescribeWebSearchKeyStatus();
             LoadTemplates();
             LoadPrompts();
             RefreshOnnxFolderList();
             _ = RefreshTemplatesAsync();
+            _ = RefreshLessonsAsync();
             _ = CheckOllamaAsync();
             _ = CheckOpenRouterAsync();
             _ = CheckLmStudioAsync();
@@ -227,6 +310,7 @@ namespace AI_IT_Company.ViewModels
             await _settings.SetAsync(AppSettingsStore.KeyFreelanceEnableFlRu, FreelanceEnableFlRu.ToString());
             await _settings.SetAsync(AppSettingsStore.KeyFreelanceEnableKwork, FreelanceEnableKwork.ToString());
             await _settings.SetAsync(AppSettingsStore.KeyFreelanceAutoAccept, FreelanceAutoAccept.ToString());
+            await _settings.SetFreelanceGitHubDraftCommentAsync(FreelanceGitHubDraftComment);
             await _settings.SetAsync(AppSettingsStore.KeyFreelanceSimulationOnly, FreelanceSimulationOnly.ToString());
             await _settings.SetAsync(AppSettingsStore.KeyFreelanceAutoAcceptThreshold, FreelanceAutoAcceptThreshold ?? "75");
             await _settings.SetAsync(AppSettingsStore.KeyFreelanceMinProfit, FreelanceMinProfit ?? "50");
@@ -263,6 +347,154 @@ namespace AI_IT_Company.ViewModels
             };
             await _settings.SetReviewChangesModeAsync(mode);
             ReviewChangesStatus = $"💾 Ревью изменений: {mode}";
+        }
+
+        [RelayCommand]
+        private async Task SaveProductModeAsync()
+        {
+            var mode = ProductModeIndex == 1 ? "Autopilot" : "Studio";
+            await _settings.SetProductModeAsync(mode);
+            ProductModeStatus = $"💾 Product mode: {mode}";
+            MainWindow.CurrentInstance?.RefreshProductMode(navigate: true);
+        }
+
+        [RelayCommand]
+        private async Task SaveBuildFixPolicyAsync()
+        {
+            if (!int.TryParse((MaxBuildFixAttemptsText ?? "").Trim(), out var attempts))
+            {
+                BuildFixPolicyStatus = "❌ Укажите целое число попыток (0–20)";
+                return;
+            }
+            attempts = Math.Clamp(attempts, 0, 20);
+            MaxBuildFixAttemptsText = attempts.ToString();
+            await _settings.SetMaxBuildFixAttemptsAsync(attempts);
+            await _settings.SetAskUserOnBuildFixExhaustedAsync(AskUserOnBuildFixExhausted);
+            BuildFixPolicyStatus = AskUserOnBuildFixExhausted
+                ? $"💾 Попыток: {attempts} · спрашивать пользователя"
+                : $"💾 Попыток: {attempts} · откат без запроса";
+        }
+
+        [RelayCommand]
+        private async Task SaveLearningPolicyAsync()
+        {
+            if (!int.TryParse((MaxCorrectionLessonsText ?? "").Trim(), out var n))
+            {
+                LearningPolicyStatus = "Enter an integer 0–30";
+                return;
+            }
+            n = Math.Clamp(n, 0, 30);
+            MaxCorrectionLessonsText = n.ToString();
+            await _settings.SetCorrectionLessonsEnabledAsync(CorrectionLessonsEnabled);
+            await _settings.SetMaxCorrectionLessonsInPromptAsync(n);
+            LearningPolicyStatus = CorrectionLessonsEnabled
+                ? $"Saved · inject up to {n} lessons"
+                : "Saved · injection off";
+        }
+
+        [RelayCommand]
+        private async Task RefreshLessonsAsync()
+        {
+            try
+            {
+                var list = await _lessons.ListAsync();
+                Lessons.Clear();
+                foreach (var l in list)
+                    Lessons.Add(LessonItemVm.From(l));
+                LearningPolicyStatus = $"Lessons: {Lessons.Count}";
+            }
+            catch (Exception ex)
+            {
+                LearningPolicyStatus = "Load failed: " + ex.Message;
+            }
+        }
+
+        [RelayCommand]
+        private async Task ToggleLessonAsync(LessonItemVm? item)
+        {
+            if (item is null) return;
+            await _lessons.SetEnabledAsync(item.Id, item.Enabled);
+        }
+
+        [RelayCommand]
+        private async Task DeleteLessonAsync(LessonItemVm? item)
+        {
+            if (item is null) return;
+            await _lessons.DeleteAsync(item.Id);
+            Lessons.Remove(item);
+        }
+
+        [RelayCommand]
+        private async Task ExportLessonsJsonlAsync()
+        {
+            try
+            {
+                var list = await _lessons.ListAsync(enabledOnly: true);
+                var dir = PathHelper.EnsureDirectory(PathHelper.LearningRoot);
+                var path = Path.Combine(dir, $"lessons-{DateTime.Now:yyyyMMdd-HHmmss}.jsonl");
+                await using var sw = new StreamWriter(path, false, Encoding.UTF8);
+                foreach (var l in list)
+                {
+                    var obj = new
+                    {
+                        instruction = "Apply the learned correction. Avoid the WRONG behavior; follow RIGHT.",
+                        input = string.IsNullOrWhiteSpace(l.ContextSnippet)
+                            ? l.WrongSummary
+                            : l.WrongSummary + "\n\n" + l.ContextSnippet,
+                        output = l.CorrectGuidance,
+                        role = l.Role,
+                        kind = l.Kind
+                    };
+                    await sw.WriteLineAsync(JsonSerializer.Serialize(obj));
+                }
+                LearningExportStatus = $"Exported {list.Count} lessons → {path}";
+            }
+            catch (Exception ex)
+            {
+                LearningExportStatus = "Export failed: " + ex.Message;
+            }
+        }
+
+        [RelayCommand]
+        private async Task CreateOllamaLearnedModelAsync()
+        {
+            var name = (LearnedModelName ?? "").Trim();
+            var from = (LearnedModelBase ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(from))
+            {
+                LearningExportStatus = "Set base model and new model name.";
+                return;
+            }
+
+            try
+            {
+                var list = await _lessons.ListAsync(enabledOnly: true);
+                if (list.Count == 0)
+                {
+                    LearningExportStatus = "No enabled lessons to bake.";
+                    return;
+                }
+
+                var system = CorrectionLessonStore.FormatSystemBlock(list);
+                var modelfile = "FROM " + from + "\nSYSTEM \"\"\"\n" + system + "\n\"\"\"\n";
+
+                LearningExportStatus = "Creating Ollama model…";
+                string last = "";
+                await foreach (var p in _client.CreateFromModelfileAsync(name, modelfile))
+                {
+                    if (!string.IsNullOrWhiteSpace(p.Status)) last = p.Status;
+                    if (!string.IsNullOrWhiteSpace(p.Error))
+                    {
+                        LearningExportStatus = "Create error: " + p.Error;
+                        return;
+                    }
+                }
+                LearningExportStatus = $"Model '{name}' created ({list.Count} lessons). Last: {last}. Assign it on Agents page.";
+            }
+            catch (Exception ex)
+            {
+                LearningExportStatus = "Create failed: " + ex.Message;
+            }
         }
 
         [RelayCommand]
@@ -422,6 +654,49 @@ namespace AI_IT_Company.ViewModels
             OpenRouterKeyHint = HasOpenRouterApiKey
                 ? "Ключ сохранён в Windows Credential Locker. Введите новый, чтобы заменить."
                 : "Ключ ещё не сохранён. Вставьте API key и нажмите «Сохранить».";
+        }
+
+        [RelayCommand]
+        private async Task SaveWebSearchAsync()
+        {
+            await _settings.SetWebSearchEnabledAsync(WebSearchEnabled);
+            await _settings.SetWebSearchProviderAsync(
+                WebSearchProviderIndex == 1 ? "Brave" : "Tavily");
+            if (int.TryParse(WebSearchMaxSnippetsText, out var sn))
+                await _settings.SetWebSearchMaxSnippetsAsync(sn);
+            if (int.TryParse(WebSearchBudgetCharsText, out var bud))
+                await _settings.SetWebSearchBudgetCharsAsync(bud);
+
+            if (!string.IsNullOrWhiteSpace(WebSearchApiKeyInput))
+            {
+                var resource = WebSearchProviderIndex == 1
+                    ? WindowsCredentialStore.BraveSearchResource
+                    : WindowsCredentialStore.TavilyResource;
+                _credentials.SetSecret(resource, WebSearchApiKeyInput);
+                WebSearchApiKeyInput = "";
+            }
+
+            WebSearchStatus = "💾 " + DescribeWebSearchKeyStatus();
+        }
+
+        [RelayCommand]
+        private void ClearWebSearchKey()
+        {
+            _credentials.RemoveSecret(WindowsCredentialStore.TavilyResource);
+            _credentials.RemoveSecret(WindowsCredentialStore.BraveSearchResource);
+            WebSearchApiKeyInput = "";
+            WebSearchStatus = "🔑 Web search keys removed.";
+        }
+
+        private string DescribeWebSearchKeyStatus()
+        {
+            var tavily = _credentials.HasSecret(WindowsCredentialStore.TavilyResource);
+            var brave = _credentials.HasSecret(WindowsCredentialStore.BraveSearchResource);
+            var on = _settings.GetWebSearchEnabled() ? "ON" : "OFF";
+            return $"Web search {on} · provider {_settings.GetWebSearchProvider()}"
+                + (tavily ? " · Tavily key OK" : "")
+                + (brave ? " · Brave key OK" : "")
+                + (!tavily && !brave ? " · no API key" : "");
         }
 
         // ---------- ONNX ----------
@@ -628,6 +903,29 @@ namespace AI_IT_Company.ViewModels
             await _settings.SetCoderModeAsync(mode);
             CoderModeStatus = $"💾 Сохранено: {CoderModeOptions[CoderModeIndex]}";
         }
+    }
+
+    public partial class LessonItemVm : ObservableObject
+    {
+        public string Id { get; init; } = "";
+        public string Role { get; init; } = "";
+        public string Kind { get; init; } = "";
+        public string WrongSummary { get; init; } = "";
+        public string CorrectGuidance { get; init; } = "";
+        public string Meta { get; init; } = "";
+
+        [ObservableProperty] private bool enabled = true;
+
+        public static LessonItemVm From(CorrectionLessonRecord r) => new()
+        {
+            Id = r.Id,
+            Role = r.Role,
+            Kind = r.Kind,
+            WrongSummary = r.WrongSummary,
+            CorrectGuidance = r.CorrectGuidance,
+            Enabled = r.Enabled,
+            Meta = $"{r.CreatedAtUtc.ToLocalTime():g} · used {r.UseCount}"
+        };
     }
 
     public partial class TemplateStatusItem : ObservableObject

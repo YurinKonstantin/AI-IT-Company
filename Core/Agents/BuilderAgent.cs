@@ -226,16 +226,29 @@ public sealed class BuilderAgent : AgentBase
             ? new[] { "fullstack_code", "game_code", "tests_code", "fix_code" }
             : new[] { "backend_code", "frontend_code", "game_code", "tests_code", "fix_code" };
 
+        var errorFiles = ctx.SharedData.GetValueOrDefault("build_error_files", "")
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         foreach (var key in keys)
         {
             if (!ctx.SharedData.TryGetValue(key, out var blob)) continue;
 
+            int filesThisKey = 0;
             foreach (var b in CodeExtractor.Extract(blob))
             {
                 if (b.Path is null) continue;
-                if (!FileWriteGuard.TryResolve(outputRoot, b.Path, out _, out var deny))
+                if (!FileWriteGuard.TryResolve(outputRoot, b.Path, out var fullPath, out var deny))
                 {
                     Logger.LogWarning("[Builder] Запись отклонена ({Path}): {Reason}", b.Path, deny);
+                    continue;
+                }
+
+                // ErrorFixer: hard cap files per fix blob.
+                if (key == "fix_code" && filesThisKey >= ErrorFixerAgent.MaxFilesPerAttempt)
+                {
+                    Logger.LogWarning("[Builder] fix_code: skip {Path} — max {Max} files",
+                        b.Path, ErrorFixerAgent.MaxFilesPerAttempt);
                     continue;
                 }
 
@@ -243,8 +256,35 @@ public sealed class BuilderAgent : AgentBase
                 {
                     bool isCsprojDiff = b.IsDiff
                         && b.Path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase);
-                    _pending.Stage(outputRoot, b.Path, b.Code, key, isCsprojDiff);
+
+                    var textToStage = b.Code;
+                    var isSearchReplace = IsSearchReplaceBlock(b);
+
+                    if (isSearchReplace && !isCsprojDiff)
+                    {
+                        string original = File.Exists(fullPath) ? File.ReadAllText(fullPath) : "";
+                        var (ok, newText, err) = SearchReplaceApplier.Apply(original, b.Code);
+                        if (!ok)
+                        {
+                            Logger.LogWarning(
+                                "[Builder] SEARCH/REPLACE failed for {Path}: {Err} — leaving for full-file fallback if present",
+                                b.Path, err);
+                            continue;
+                        }
+                        textToStage = newText;
+                    }
+                    else if (key == "fix_code" && !isCsprojDiff
+                             && !ShouldAcceptFullRewrite(fullPath, b.Code, b.Path, errorFiles))
+                    {
+                        Logger.LogWarning(
+                            "[Builder] Rejected oversized full rewrite of {Path} (prefer SEARCH/REPLACE)",
+                            b.Path);
+                        continue;
+                    }
+
+                    _pending.Stage(outputRoot, b.Path, textToStage, key, isCsprojDiff);
                     staged++;
+                    filesThisKey++;
                 }
                 catch (Exception ex)
                 {
@@ -256,6 +296,52 @@ public sealed class BuilderAgent : AgentBase
             ctx.SharedData.Remove(key);
         }
         return staged;
+    }
+
+    private static bool IsSearchReplaceBlock(CodeExtractor.Block b)
+        => b.Lang.Contains("search-replace", StringComparison.OrdinalIgnoreCase)
+           || b.Lang.Equals("patch", StringComparison.OrdinalIgnoreCase)
+           || SearchReplaceApplier.LooksLikeSearchReplace(b.Code);
+
+    /// <summary>
+    /// Guardrail: reject full-file rewrites that replace most of a large existing file
+    /// when the path is not in the structured error list.
+    /// </summary>
+    private static bool ShouldAcceptFullRewrite(
+        string fullPath, string newText, string relativePath, HashSet<string> errorFiles)
+    {
+        if (!File.Exists(fullPath)) return true;
+
+        string oldText;
+        try { oldText = File.ReadAllText(fullPath); }
+        catch { return true; }
+
+        if (oldText.Length < 800) return true;
+
+        var rel = relativePath.Replace('\\', '/');
+        var inErrors = errorFiles.Count == 0
+            || errorFiles.Contains(rel)
+            || errorFiles.Any(e =>
+                Path.GetFileName(e).Equals(Path.GetFileName(rel), StringComparison.OrdinalIgnoreCase));
+
+        // If file is on the error list, allow rewrite but still reject near-total replacement of huge files
+        // unless the new content shares a reasonable prefix with the old (model kept the start).
+        var prefixLen = 0;
+        var maxCheck = Math.Min(200, Math.Min(oldText.Length, newText.Length));
+        while (prefixLen < maxCheck && oldText[prefixLen] == newText[prefixLen]) prefixLen++;
+
+        var sizeRatio = newText.Length / (double)Math.Max(1, oldText.Length);
+        var almostTotalRewrite = prefixLen < 40 && oldText.Length > 1500
+            && (sizeRatio < 0.4 || sizeRatio > 2.5 || Math.Abs(newText.Length - oldText.Length) > oldText.Length * 0.6);
+
+        if (almostTotalRewrite && !inErrors)
+            return false;
+
+        // Even on error list: refuse if model dumped a tiny stub over a large file.
+        if (almostTotalRewrite && newText.Length < oldText.Length * 0.35 && oldText.Length > 2500)
+            return false;
+
+        return true;
     }
 
     /// <summary>

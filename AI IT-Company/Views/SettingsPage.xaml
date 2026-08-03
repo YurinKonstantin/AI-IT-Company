@@ -1,419 +1,686 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="AI_IT_Company.Views.SettingsPage"
+    x:Name="RootPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:AI_IT_Company.Views"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:viewmodels="using:AI_IT_Company.ViewModels"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewmodels="using:AI_IT_Company.ViewModels"
     mc:Ignorable="d">
 
-    <ScrollViewer>
-        <StackPanel Padding="16" Spacing="24" MaxWidth="1100" HorizontalAlignment="Left">
+    <Grid Padding="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-            <TextBlock Text="⚙ Настройки" Style="{ThemeResource TitleTextBlockStyle}"/>
+        <TextBlock x:Uid="Settings_Title"
+                   Text="Settings"
+                   Style="{ThemeResource TitleTextBlockStyle}"
+                   Margin="0,0,0,12"/>
 
-            <!-- ============= AI PROVIDERS ============= -->
-            <Border BorderThickness="1" CornerRadius="8" Padding="16"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                <StackPanel Spacing="16">
-                    <TextBlock Text="Провайдеры AI" FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Opacity="0.7" TextWrapping="Wrap"
-                               Text="Приоритет — локальный запуск (Ollama / LM Studio / ONNX). OpenRouter — облачный запасной вариант. Источник для каждого агента выбирается на странице «Агенты»."/>
+        <Pivot Grid.Row="1">
 
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ComboBox Header="Провайдер по умолчанию"
-                                  MinWidth="220"
-                                  ItemsSource="{x:Bind ViewModel.AiProviderOptions}"
-                                  SelectedItem="{x:Bind ViewModel.DefaultAiProvider, Mode=TwoWay}"/>
-                        <Button Content="💾 Сохранить"
-                                Style="{ThemeResource AccentButtonStyle}"
-                                Command="{x:Bind ViewModel.SaveDefaultProviderCommand}"
-                                VerticalAlignment="Bottom"/>
-                        <TextBlock Text="{x:Bind ViewModel.DefaultProviderStatus, Mode=OneWay}"
-                                   VerticalAlignment="Bottom" Opacity="0.75" Margin="0,0,0,8"/>
+            <!-- ============= PROVIDERS ============= -->
+            <PivotItem x:Uid="Settings_Tab_Providers" Header="Providers">
+                <ScrollViewer>
+                    <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="16">
+                                <TextBlock Text="AI providers" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="Prefer local runtimes (Ollama / LM Studio / ONNX). OpenRouter is the cloud fallback. Per-agent source is chosen on the Agents page."/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ComboBox Header="Default provider"
+                                              MinWidth="220"
+                                              ItemsSource="{x:Bind ViewModel.AiProviderOptions}"
+                                              SelectedItem="{x:Bind ViewModel.DefaultAiProvider, Mode=TwoWay}"/>
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveDefaultProviderCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                    <TextBlock Text="{x:Bind ViewModel.DefaultProviderStatus, Mode=OneWay}"
+                                               VerticalAlignment="Bottom" Opacity="0.75" Margin="0,0,0,8"/>
+                                </StackPanel>
+
+                                <!-- Ollama -->
+                                <TextBlock Text="Ollama (local)" FontWeight="SemiBold"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBox PlaceholderText="http://localhost:11434"
+                                             Header="Server URL"
+                                             Width="380"
+                                             Text="{x:Bind ViewModel.OllamaUrl, Mode=TwoWay}"/>
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveOllamaCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                    <Button Content="Check"
+                                            Command="{x:Bind ViewModel.CheckOllamaCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                </StackPanel>
+                                <TextBlock Text="{x:Bind ViewModel.OllamaStatus, Mode=OneWay}" Opacity="0.85"/>
+
+                                <!-- LM Studio -->
+                                <TextBlock Text="LM Studio (local, OpenAI-compatible)" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBox PlaceholderText="http://localhost:1234/v1"
+                                             Header="Base URL"
+                                             Width="380"
+                                             Text="{x:Bind ViewModel.LmStudioUrl, Mode=TwoWay}"/>
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveLmStudioCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                    <Button Content="Check"
+                                            Command="{x:Bind ViewModel.CheckLmStudioCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                </StackPanel>
+                                <TextBlock Text="{x:Bind ViewModel.LmStudioStatus, Mode=OneWay}" Opacity="0.85"/>
+
+                                <!-- OpenRouter -->
+                                <TextBlock Text="OpenRouter (cloud)" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                <TextBox PlaceholderText="https://openrouter.ai/api/v1"
+                                         Header="Base URL"
+                                         Width="480"
+                                         HorizontalAlignment="Left"
+                                         Text="{x:Bind ViewModel.OpenRouterBaseUrl, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <PasswordBox x:Name="OpenRouterKeyBox"
+                                                 Header="API key (Windows Credential Locker)"
+                                                 Width="380"
+                                                 PasswordChanged="OpenRouterKeyBox_PasswordChanged"/>
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveOpenRouterCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                    <Button Content="Check"
+                                            Command="{x:Bind ViewModel.CheckOpenRouterCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                    <Button Content="Remove key"
+                                            Command="{x:Bind ViewModel.ClearOpenRouterKeyCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                </StackPanel>
+                                <TextBlock Opacity="0.7" Text="{x:Bind ViewModel.OpenRouterKeyHint, Mode=OneWay}"/>
+                                <TextBlock Text="{x:Bind ViewModel.OpenRouterStatus, Mode=OneWay}" Opacity="0.85"/>
+
+                                <!-- Web search (Architect / ErrorFixer) -->
+                                <TextBlock Text="Web search (Architect / ErrorFixer only)" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="Opt-in. Injects 1–3 budgeted snippets into Architect and ErrorFixer prompts. Requires a Tavily or Brave API key in Credential Locker. Coders never call search."/>
+                                <CheckBox Content="Enable web search"
+                                          IsChecked="{x:Bind ViewModel.WebSearchEnabled, Mode=TwoWay}"/>
+                                <ComboBox Header="Provider"
+                                          MinWidth="200"
+                                          ItemsSource="{x:Bind ViewModel.WebSearchProviderOptions}"
+                                          SelectedIndex="{x:Bind ViewModel.WebSearchProviderIndex, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBox Header="Max snippets (1–3)" Width="140"
+                                             Text="{x:Bind ViewModel.WebSearchMaxSnippetsText, Mode=TwoWay}"/>
+                                    <TextBox Header="Budget chars" Width="160"
+                                             Text="{x:Bind ViewModel.WebSearchBudgetCharsText, Mode=TwoWay}"/>
+                                </StackPanel>
+                                <PasswordBox x:Name="WebSearchKeyBox"
+                                             Header="API key (Tavily or Brave)"
+                                             Width="380"
+                                             HorizontalAlignment="Left"
+                                             PasswordChanged="WebSearchKeyBox_PasswordChanged"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save search"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveWebSearchCommand}"/>
+                                    <Button Content="Remove key"
+                                            Command="{x:Bind ViewModel.ClearWebSearchKeyCommand}"/>
+                                    <TextBlock Text="{x:Bind ViewModel.WebSearchStatus, Mode=OneWay}"
+                                               VerticalAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+
+                                <!-- ONNX -->
+                                <TextBlock Text="ONNX / Windows ML (local, Microsoft ML)" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="Place a model folder with genai_config.json under the root below. In agent settings, set ModelName to the subfolder name."/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBox Header="Models folder"
+                                             Width="480"
+                                             Text="{x:Bind ViewModel.OnnxModelsPath, Mode=TwoWay}"/>
+                                    <Button Content="Browse"
+                                            Command="{x:Bind ViewModel.BrowseOnnxFolderCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveOnnxCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                    <Button Content="Check"
+                                            Command="{x:Bind ViewModel.CheckOnnxCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                </StackPanel>
+                                <TextBlock Text="{x:Bind ViewModel.OnnxStatus, Mode=OneWay}" Opacity="0.85"/>
+                                <ItemsControl ItemsSource="{x:Bind ViewModel.OnnxModelFolders}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock FontFamily="Consolas" Opacity="0.8" Text="{Binding}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
+                </ScrollViewer>
+            </PivotItem>
 
-                    <!-- Ollama -->
-                    <TextBlock Text="Ollama (локально)" FontWeight="SemiBold"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBox PlaceholderText="http://localhost:11434"
-                                 Header="URL сервера"
-                                 Width="380"
-                                 Text="{x:Bind ViewModel.OllamaUrl, Mode=TwoWay}"/>
-                        <Button Content="💾 Сохранить"
-                                Style="{ThemeResource AccentButtonStyle}"
-                                Command="{x:Bind ViewModel.SaveOllamaCommand}"
-                                VerticalAlignment="Bottom"/>
-                        <Button Content="🔌 Проверить"
-                                Command="{x:Bind ViewModel.CheckOllamaCommand}"
-                                VerticalAlignment="Bottom"/>
+            <!-- ============= PIPELINE ============= -->
+            <PivotItem x:Uid="Settings_Tab_Pipeline" Header="Pipeline">
+                <ScrollViewer>
+                    <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+
+                        <!-- Coder mode -->
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Code writing mode" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="Choose how agents write code at each stage. A single Fullstack coder is faster and keeps contracts consistent, but needs a stronger model. Split mode works better with smaller models."/>
+
+                                <ComboBox Header="What to use"
+                                          MinWidth="480"
+                                          ItemsSource="{x:Bind ViewModel.CoderModeOptions}"
+                                          SelectedIndex="{x:Bind ViewModel.CoderModeIndex, Mode=TwoWay}"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveCoderModeCommand}"/>
+                                    <TextBlock Text="{x:Bind ViewModel.CoderModeStatus, Mode=OneWay}"
+                                               VerticalAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Build fix policy -->
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Build and auto-fix" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="How many times ErrorFixer retries a failed build. If that fails — either ask you (manual fix / continue with error / rollback), or roll back immediately."/>
+
+                                <TextBox Header="Auto-fix attempts (0–20)"
+                                         Width="220" HorizontalAlignment="Left"
+                                         Text="{x:Bind ViewModel.MaxBuildFixAttemptsText, Mode=TwoWay}"/>
+
+                                <CheckBox Content="Ask the user if the error is not fixed"
+                                          IsChecked="{x:Bind ViewModel.AskUserOnBuildFixExhausted, Mode=TwoWay}"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveBuildFixPolicyCommand}"/>
+                                    <TextBlock Text="{x:Bind ViewModel.BuildFixPolicyStatus, Mode=OneWay}"
+                                               VerticalAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Product mode -->
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Product mode" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="Studio — vibe coding on the Agent page. Autopilot — freelance hunt (internal pipeline only, no marketplace bids). Also switchable from the title bar."/>
+                                <ComboBox Header="Default mode on launch"
+                                          MinWidth="360"
+                                          ItemsSource="{x:Bind ViewModel.ProductModeOptions}"
+                                          SelectedIndex="{x:Bind ViewModel.ProductModeIndex, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveProductModeCommand}"/>
+                                    <TextBlock Text="{x:Bind ViewModel.ProductModeStatus, Mode=OneWay}"
+                                               VerticalAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Review changes -->
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Review changes" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="In Improve/Fix modes the pipeline can wait for Apply/Reject on the Changes tab. CreateNew applies edits immediately by default (ImproveFix mode)."/>
+
+                                <ComboBox Header="Review edits before build"
+                                          MinWidth="420"
+                                          ItemsSource="{x:Bind ViewModel.ReviewChangesModeOptions}"
+                                          SelectedIndex="{x:Bind ViewModel.ReviewChangesModeIndex, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveReviewChangesCommand}"/>
+                                    <TextBlock Text="{x:Bind ViewModel.ReviewChangesStatus, Mode=OneWay}"
+                                               VerticalAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                     </StackPanel>
-                    <TextBlock Text="{x:Bind ViewModel.OllamaStatus, Mode=OneWay}" Opacity="0.85"/>
+                </ScrollViewer>
+            </PivotItem>
 
-                    <!-- LM Studio -->
-                    <TextBlock Text="LM Studio (локально, OpenAI-compatible)" FontWeight="SemiBold" Margin="0,8,0,0"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBox PlaceholderText="http://localhost:1234/v1"
-                                 Header="Base URL"
-                                 Width="380"
-                                 Text="{x:Bind ViewModel.LmStudioUrl, Mode=TwoWay}"/>
-                        <Button Content="💾 Сохранить"
-                                Style="{ThemeResource AccentButtonStyle}"
-                                Command="{x:Bind ViewModel.SaveLmStudioCommand}"
-                                VerticalAlignment="Bottom"/>
-                        <Button Content="🔌 Проверить"
-                                Command="{x:Bind ViewModel.CheckLmStudioCommand}"
-                                VerticalAlignment="Bottom"/>
+            <!-- ============= LANGUAGE ============= -->
+            <PivotItem x:Uid="Settings_Tab_Language" Header="Language">
+                <ScrollViewer>
+                    <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+
+                        <!-- UI language -->
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="UI language" FontSize="18" FontWeight="SemiBold"/>
+                                <ComboBox Header="UI language" MinWidth="280"
+                                          ItemsSource="{x:Bind ViewModel.UiLanguageOptions}"
+                                          SelectedIndex="{x:Bind ViewModel.UiLanguageIndex, Mode=TwoWay}"/>
+                                <Button Content="Save UI language"
+                                        Command="{x:Bind ViewModel.SaveUiLanguageCommand}"
+                                        Style="{ThemeResource AccentButtonStyle}"/>
+                                <TextBlock Text="{x:Bind ViewModel.UiLanguageStatus, Mode=OneWay}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Translation -->
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Prompt translation" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="Write prompts in your language. A separate model translates them to English (models perform better in English), then requirements and reports are translated back to your language."/>
+
+                                <ToggleSwitch Header="Enable translation"
+                                              IsOn="{x:Bind ViewModel.TranslationEnabled, Mode=TwoWay}"
+                                              OnContent="on" OffContent="off"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <ComboBox Header="Your language"
+                                              MinWidth="180"
+                                              ItemsSource="{x:Bind ViewModel.SupportedLanguages}"
+                                              SelectedItem="{x:Bind ViewModel.UserLanguage, Mode=TwoWay}"/>
+                                    <ComboBox Header="Agents working language"
+                                              MinWidth="180"
+                                              ItemsSource="{x:Bind ViewModel.SupportedLanguages}"
+                                              SelectedItem="{x:Bind ViewModel.WorkingLanguage, Mode=TwoWay}"/>
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveTranslationCommand}"
+                                            VerticalAlignment="Bottom"/>
+                                </StackPanel>
+                                <TextBlock Text="{x:Bind ViewModel.TranslationStatus, Mode=OneWay}" Opacity="0.8"/>
+                            </StackPanel>
+                        </Border>
+
                     </StackPanel>
-                    <TextBlock Text="{x:Bind ViewModel.LmStudioStatus, Mode=OneWay}" Opacity="0.85"/>
+                </ScrollViewer>
+            </PivotItem>
 
-                    <!-- OpenRouter -->
-                    <TextBlock Text="OpenRouter (интернет)" FontWeight="SemiBold" Margin="0,8,0,0"/>
-                    <TextBox PlaceholderText="https://openrouter.ai/api/v1"
-                             Header="Base URL"
-                             Width="480"
-                             HorizontalAlignment="Left"
-                             Text="{x:Bind ViewModel.OpenRouterBaseUrl, Mode=TwoWay}"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PasswordBox x:Name="OpenRouterKeyBox"
-                                     Header="API key (Windows Credential Locker)"
-                                     Width="380"
-                                     PasswordChanged="OpenRouterKeyBox_PasswordChanged"/>
-                        <Button Content="💾 Сохранить"
-                                Style="{ThemeResource AccentButtonStyle}"
-                                Command="{x:Bind ViewModel.SaveOpenRouterCommand}"
-                                VerticalAlignment="Bottom"/>
-                        <Button Content="🔌 Проверить"
-                                Command="{x:Bind ViewModel.CheckOpenRouterCommand}"
-                                VerticalAlignment="Bottom"/>
-                        <Button Content="🗑 Удалить ключ"
-                                Command="{x:Bind ViewModel.ClearOpenRouterKeyCommand}"
-                                VerticalAlignment="Bottom"/>
+            <!-- ============= EDITOR ============= -->
+            <PivotItem x:Uid="Settings_Tab_Editor" Header="Editor">
+                <ScrollViewer>
+                    <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="External editor" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBox Header="External editor (path to exe)"
+                                         PlaceholderText="C:\Users\...\AppData\Local\Programs\Microsoft VS Code\Code.exe"
+                                         Text="{x:Bind ViewModel.ExternalEditorPath, Mode=TwoWay}"/>
+                                <TextBox Header="Arguments ({file}, {line})"
+                                         PlaceholderText="&quot;{file}&quot;"
+                                         Text="{x:Bind ViewModel.ExternalEditorArgs, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveExternalEditorCommand}"/>
+                                    <TextBlock Text="{x:Bind ViewModel.ExternalEditorStatus, Mode=OneWay}"
+                                               VerticalAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                    <TextBlock Opacity="0.7" Text="{x:Bind ViewModel.OpenRouterKeyHint, Mode=OneWay}"/>
-                    <TextBlock Text="{x:Bind ViewModel.OpenRouterStatus, Mode=OneWay}" Opacity="0.85"/>
-
-                    <!-- ONNX -->
-                    <TextBlock Text="ONNX / Windows ML (локально, Microsoft ML)" FontWeight="SemiBold" Margin="0,8,0,0"/>
-                    <TextBlock Opacity="0.7" TextWrapping="Wrap"
-                               Text="Положите папку модели с genai_config.json в корень ниже. В настройках агента укажите имя подпапки как ModelName."/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBox Header="Папка моделей"
-                                 Width="480"
-                                 Text="{x:Bind ViewModel.OnnxModelsPath, Mode=TwoWay}"/>
-                        <Button Content="📁 Обзор"
-                                Command="{x:Bind ViewModel.BrowseOnnxFolderCommand}"
-                                VerticalAlignment="Bottom"/>
-                        <Button Content="💾 Сохранить"
-                                Style="{ThemeResource AccentButtonStyle}"
-                                Command="{x:Bind ViewModel.SaveOnnxCommand}"
-                                VerticalAlignment="Bottom"/>
-                        <Button Content="🔌 Проверить"
-                                Command="{x:Bind ViewModel.CheckOnnxCommand}"
-                                VerticalAlignment="Bottom"/>
-                    </StackPanel>
-                    <TextBlock Text="{x:Bind ViewModel.OnnxStatus, Mode=OneWay}" Opacity="0.85"/>
-                    <ItemsControl ItemsSource="{x:Bind ViewModel.OnnxModelFolders}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock FontFamily="Consolas" Opacity="0.8" Text="{Binding}"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </Border>
-            <!-- ============= РЕЖИМ КОДЕРОВ ============= -->
-            <Border BorderThickness="1" CornerRadius="8" Padding="16"
-        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Режим написания кода" FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Opacity="0.7"
-                   Text="Выберите, как агенты будут писать код на каждом этапе. Единый Fullstack-кодер работает быстрее и лучше держит согласованность контрактов, но требует более сильной модели. Раздельный режим лучше для маленьких моделей."/>
-
-                    <ComboBox Header="Что использовать"
-                  MinWidth="480"
-                  ItemsSource="{x:Bind ViewModel.CoderModeOptions}"
-                  SelectedIndex="{x:Bind ViewModel.CoderModeIndex, Mode=TwoWay}"/>
-
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="💾 Сохранить"
-                    Style="{ThemeResource AccentButtonStyle}"
-                    Command="{x:Bind ViewModel.SaveCoderModeCommand}"/>
-                        <TextBlock Text="{x:Bind ViewModel.CoderModeStatus, Mode=OneWay}"
-                       VerticalAlignment="Center" Opacity="0.75"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
+                </ScrollViewer>
+            </PivotItem>
 
             <!-- ============= FREELANCE ============= -->
-            <Border BorderThickness="1" CornerRadius="8" Padding="16"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Биржа / фриланс" FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Opacity="0.7" TextWrapping="Wrap"
-                               Text="Источники: Demo, GitHub bounties (Issues), FL.ru/Kwork через JSON feed URL. Авто-принятие запускает только внутренний пайплайн, без отклика на бирже."/>
+            <PivotItem x:Uid="Settings_Tab_Freelance" Header="Freelance">
+                <ScrollViewer>
+                    <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Freelance / marketplace" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="Sources: Demo, GitHub bounties (Issues), FL.ru/Kwork via JSON feed URL. Auto-accept only starts the internal pipeline — it does not reply on the marketplace."/>
 
-                    <StackPanel Orientation="Horizontal" Spacing="16">
-                        <CheckBox Content="Demo" IsChecked="{x:Bind ViewModel.FreelanceEnableDemo, Mode=TwoWay}"/>
-                        <CheckBox Content="GitHub bounties" IsChecked="{x:Bind ViewModel.FreelanceEnableGitHub, Mode=TwoWay}"/>
-                        <CheckBox Content="FL.ru feed" IsChecked="{x:Bind ViewModel.FreelanceEnableFlRu, Mode=TwoWay}"/>
-                        <CheckBox Content="Kwork feed" IsChecked="{x:Bind ViewModel.FreelanceEnableKwork, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                    <CheckBox Content="Demo" IsChecked="{x:Bind ViewModel.FreelanceEnableDemo, Mode=TwoWay}"/>
+                                    <CheckBox Content="GitHub bounties" IsChecked="{x:Bind ViewModel.FreelanceEnableGitHub, Mode=TwoWay}"/>
+                                    <CheckBox Content="FL.ru feed" IsChecked="{x:Bind ViewModel.FreelanceEnableFlRu, Mode=TwoWay}"/>
+                                    <CheckBox Content="Kwork feed" IsChecked="{x:Bind ViewModel.FreelanceEnableKwork, Mode=TwoWay}"/>
+                                </StackPanel>
+
+                                <TextBox Header="Skills (comma-separated)"
+                                         Text="{x:Bind ViewModel.FreelanceSkills, Mode=TwoWay}"/>
+                                <TextBox Header="Hunt keywords"
+                                         Text="{x:Bind ViewModel.FreelanceKeywords, Mode=TwoWay}"/>
+                                <TextBox Header="GitHub search query"
+                                         PlaceholderText="is:issue is:open label:bounty"
+                                         Text="{x:Bind ViewModel.FreelanceGitHubQuery, Mode=TwoWay}"/>
+                                <TextBox Header="GitHub PAT (optional, for API rate limit)"
+                                         PlaceholderText="ghp_..."
+                                         Text="{x:Bind ViewModel.GitHubPatInput, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="{x:Bind ViewModel.HasGitHubPat, Mode=OneWay}" Opacity="0.7"
+                                               VerticalAlignment="Center"/>
+                                    <Button Content="Remove PAT" Command="{x:Bind ViewModel.ClearGitHubPatCommand}"/>
+                                </StackPanel>
+
+                                <TextBox Header="Rate $/hour" Width="160" HorizontalAlignment="Left"
+                                         Text="{x:Bind ViewModel.FreelanceHourlyRate, Mode=TwoWay}"/>
+                                <CheckBox Content="Auto-accept into internal pipeline (opt-in)"
+                                          IsChecked="{x:Bind ViewModel.FreelanceAutoAccept, Mode=TwoWay}"/>
+                                <CheckBox Content="GitHub: post draft comment on Accept (opt-in, needs PAT)"
+                                          IsChecked="{x:Bind ViewModel.FreelanceGitHubDraftComment, Mode=TwoWay}"/>
+                                <CheckBox Content="Simulation only (hunt+score without Accept)"
+                                          IsChecked="{x:Bind ViewModel.FreelanceSimulationOnly, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <TextBox Header="Score threshold" Width="120"
+                                             Text="{x:Bind ViewModel.FreelanceAutoAcceptThreshold, Mode=TwoWay}"/>
+                                    <TextBox Header="Min profit" Width="120"
+                                             Text="{x:Bind ViewModel.FreelanceMinProfit, Mode=TwoWay}"/>
+                                </StackPanel>
+                                <TextBox Header="FL.ru JSON feed URL"
+                                         Text="{x:Bind ViewModel.FreelanceFlRuFeedUrl, Mode=TwoWay}"/>
+                                <TextBox Header="Kwork JSON feed URL"
+                                         Text="{x:Bind ViewModel.FreelanceKworkFeedUrl, Mode=TwoWay}"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save freelance"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveFreelanceCommand}"/>
+                                    <TextBlock Text="{x:Bind ViewModel.FreelanceStatus, Mode=OneWay}"
+                                               VerticalAlignment="Center" Opacity="0.8"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
+                </ScrollViewer>
+            </PivotItem>
 
-                    <TextBox Header="Навыки (через запятую)"
-                             Text="{x:Bind ViewModel.FreelanceSkills, Mode=TwoWay}"/>
-                    <TextBox Header="Ключевые слова охоты"
-                             Text="{x:Bind ViewModel.FreelanceKeywords, Mode=TwoWay}"/>
-                    <TextBox Header="GitHub search query"
-                             PlaceholderText="is:issue is:open label:bounty"
-                             Text="{x:Bind ViewModel.FreelanceGitHubQuery, Mode=TwoWay}"/>
-                    <TextBox Header="GitHub PAT (опционально, для лимита API)"
-                             PlaceholderText="ghp_..."
-                             Text="{x:Bind ViewModel.GitHubPatInput, Mode=TwoWay}"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="{x:Bind ViewModel.HasGitHubPat, Mode=OneWay}" Opacity="0.7"
-                                   VerticalAlignment="Center"/>
-                        <Button Content="🗑 Удалить PAT" Command="{x:Bind ViewModel.ClearGitHubPatCommand}"/>
+            <!-- ============= LEARNING ============= -->
+            <PivotItem x:Uid="Settings_Tab_Learning" Header="Learning">
+                <ScrollViewer>
+                    <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Correction memory" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="Lessons from Teach / Reject are injected into ErrorFixer and coder prompts so small models stop repeating the same mistakes. Optional: bake into an Ollama model or export JSONL for external LoRA."/>
+
+                                <CheckBox Content="Inject lessons into agent prompts"
+                                          IsChecked="{x:Bind ViewModel.CorrectionLessonsEnabled, Mode=TwoWay}"/>
+                                <TextBox Header="Max lessons in prompt (0–30)"
+                                         Width="200" HorizontalAlignment="Left"
+                                         Text="{x:Bind ViewModel.MaxCorrectionLessonsText, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveLearningPolicyCommand}"/>
+                                    <Button Content="Refresh list"
+                                            Command="{x:Bind ViewModel.RefreshLessonsCommand}"/>
+                                    <TextBlock Text="{x:Bind ViewModel.LearningPolicyStatus, Mode=OneWay}"
+                                               VerticalAlignment="Center" Opacity="0.8"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Lessons" FontSize="16" FontWeight="SemiBold"/>
+                                <ItemsRepeater ItemsSource="{x:Bind ViewModel.Lessons, Mode=OneWay}">
+                                    <ItemsRepeater.Layout>
+                                        <StackLayout Orientation="Vertical" Spacing="8"/>
+                                    </ItemsRepeater.Layout>
+                                    <DataTemplate x:DataType="viewmodels:LessonItemVm">
+                                        <Border Padding="10" CornerRadius="6"
+                                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                            <Grid ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock FontWeight="SemiBold">
+                                                        <Run Text="{x:Bind Role}"/>
+                                                        <Run Text=" · "/>
+                                                        <Run Text="{x:Bind Kind}"/>
+                                                    </TextBlock>
+                                                    <TextBlock Opacity="0.75" TextWrapping="Wrap"
+                                                               Text="{x:Bind WrongSummary}"/>
+                                                    <TextBlock TextWrapping="Wrap"
+                                                               Text="{x:Bind CorrectGuidance}"/>
+                                                    <TextBlock Opacity="0.55" FontSize="11"
+                                                               Text="{x:Bind Meta}"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Spacing="6">
+                                                    <CheckBox Content="Enabled"
+                                                              IsChecked="{x:Bind Enabled, Mode=TwoWay}"
+                                                              Command="{Binding ElementName=RootPage, Path=ViewModel.ToggleLessonCommand}"
+                                                              CommandParameter="{x:Bind}"/>
+                                                    <Button Content="Delete"
+                                                            Command="{Binding ElementName=RootPage, Path=ViewModel.DeleteLessonCommand}"
+                                                            CommandParameter="{x:Bind}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsRepeater>
+                            </StackPanel>
+                        </Border>
+
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Ollama adapted model / export" FontSize="16" FontWeight="SemiBold"/>
+                                <TextBox Header="Base model (FROM)"
+                                         Width="360" HorizontalAlignment="Left"
+                                         PlaceholderText="qwen2.5-coder:7b"
+                                         Text="{x:Bind ViewModel.LearnedModelBase, Mode=TwoWay}"/>
+                                <TextBox Header="New model name"
+                                         Width="360" HorizontalAlignment="Left"
+                                         PlaceholderText="aiit-learned"
+                                         Text="{x:Bind ViewModel.LearnedModelName, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Create Ollama model from lessons"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.CreateOllamaLearnedModelCommand}"/>
+                                    <Button Content="Export JSONL"
+                                            Command="{x:Bind ViewModel.ExportLessonsJsonlCommand}"/>
+                                </StackPanel>
+                                <TextBlock Text="{x:Bind ViewModel.LearningExportStatus, Mode=OneWay}"
+                                           Opacity="0.85" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
+                </ScrollViewer>
+            </PivotItem>
 
-                    <TextBox Header="Ставка $/час" Width="160" HorizontalAlignment="Left"
-                             Text="{x:Bind ViewModel.FreelanceHourlyRate, Mode=TwoWay}"/>
-                    <CheckBox Content="Авто-принятие во внутренний пайплайн (opt-in)"
-                              IsChecked="{x:Bind ViewModel.FreelanceAutoAccept, Mode=TwoWay}"/>
-                    <CheckBox Content="Только симуляция (hunt+score без Accept)"
-                              IsChecked="{x:Bind ViewModel.FreelanceSimulationOnly, Mode=TwoWay}"/>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <TextBox Header="Порог score" Width="120"
-                                 Text="{x:Bind ViewModel.FreelanceAutoAcceptThreshold, Mode=TwoWay}"/>
-                        <TextBox Header="Мин. прибыль" Width="120"
-                                 Text="{x:Bind ViewModel.FreelanceMinProfit, Mode=TwoWay}"/>
+            <!-- ============= ARTIST ============= -->
+            <PivotItem x:Uid="Settings_Tab_Artist" Header="Artist">
+                <ScrollViewer>
+                    <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Artist — sprite generation" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Opacity="0.7" TextWrapping="Wrap"
+                                           Text="Default is local procedural pixel-art (no API). OpenRouter and Ollama are optional; on image-gen failure Artist falls back to procedural."/>
+
+                                <ComboBox Header="Image source"
+                                          MinWidth="480"
+                                          ItemsSource="{x:Bind ViewModel.ArtistImageModeOptions}"
+                                          SelectedIndex="{x:Bind ViewModel.ArtistImageModeIndex, Mode=TwoWay}"/>
+
+                                <TextBox Header="OpenRouter model (image)"
+                                         Width="480" HorizontalAlignment="Left"
+                                         PlaceholderText="google/gemini-2.5-flash-image-preview"
+                                         Text="{x:Bind ViewModel.ArtistOpenRouterImageModel, Mode=TwoWay}"/>
+
+                                <TextBox Header="Ollama model (image-capable)"
+                                         Width="480" HorizontalAlignment="Left"
+                                         PlaceholderText="model name from ollama list"
+                                         Text="{x:Bind ViewModel.ArtistOllamaImageModel, Mode=TwoWay}"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Command="{x:Bind ViewModel.SaveArtistImageCommand}"/>
+                                    <TextBlock Text="{x:Bind ViewModel.ArtistImageStatus, Mode=OneWay}"
+                                               VerticalAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                    <TextBox Header="FL.ru JSON feed URL"
-                             Text="{x:Bind ViewModel.FreelanceFlRuFeedUrl, Mode=TwoWay}"/>
-                    <TextBox Header="Kwork JSON feed URL"
-                             Text="{x:Bind ViewModel.FreelanceKworkFeedUrl, Mode=TwoWay}"/>
-
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="💾 Сохранить биржу"
-                                Style="{ThemeResource AccentButtonStyle}"
-                                Command="{x:Bind ViewModel.SaveFreelanceCommand}"/>
-                        <TextBlock Text="{x:Bind ViewModel.FreelanceStatus, Mode=OneWay}"
-                                   VerticalAlignment="Center" Opacity="0.8"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- ============= CHANGES / EDITOR ============= -->
-            <Border BorderThickness="1" CornerRadius="8" Padding="16"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Изменения и редактор" FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Opacity="0.7" TextWrapping="Wrap"
-                               Text="В режимах Improve/Fix пайплайн может ждать Apply/Reject на вкладке «Изменения». CreateNew по умолчанию применяет правки сразу (режим ImproveFix)."/>
-
-                    <ComboBox Header="Ревью правок перед сборкой"
-                              MinWidth="420"
-                              ItemsSource="{x:Bind ViewModel.ReviewChangesModeOptions}"
-                              SelectedIndex="{x:Bind ViewModel.ReviewChangesModeIndex, Mode=TwoWay}"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="💾 Сохранить"
-                                Style="{ThemeResource AccentButtonStyle}"
-                                Command="{x:Bind ViewModel.SaveReviewChangesCommand}"/>
-                        <TextBlock Text="{x:Bind ViewModel.ReviewChangesStatus, Mode=OneWay}"
-                                   VerticalAlignment="Center" Opacity="0.75"/>
-                    </StackPanel>
-
-                    <TextBox Header="Внешний редактор (путь к exe)"
-                             PlaceholderText="C:\Users\...\AppData\Local\Programs\Microsoft VS Code\Code.exe"
-                             Text="{x:Bind ViewModel.ExternalEditorPath, Mode=TwoWay}"/>
-                    <TextBox Header="Аргументы ({file}, {line})"
-                             PlaceholderText="&quot;{file}&quot;"
-                             Text="{x:Bind ViewModel.ExternalEditorArgs, Mode=TwoWay}"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="💾 Сохранить"
-                                Style="{ThemeResource AccentButtonStyle}"
-                                Command="{x:Bind ViewModel.SaveExternalEditorCommand}"/>
-                        <TextBlock Text="{x:Bind ViewModel.ExternalEditorStatus, Mode=OneWay}"
-                                   VerticalAlignment="Center" Opacity="0.75"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- ============= ARTIST IMAGE-GEN ============= -->
-            <Border BorderThickness="1" CornerRadius="8" Padding="16"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Художник — генерация спрайтов" FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Opacity="0.7" TextWrapping="Wrap"
-                               Text="По умолчанию — локальный процедурный pixel-art (без API). OpenRouter и Ollama опциональны; при ошибке image-gen Artist автоматически откатывается на procedural."/>
-
-                    <ComboBox Header="Источник изображений"
-                              MinWidth="480"
-                              ItemsSource="{x:Bind ViewModel.ArtistImageModeOptions}"
-                              SelectedIndex="{x:Bind ViewModel.ArtistImageModeIndex, Mode=TwoWay}"/>
-
-                    <TextBox Header="Модель OpenRouter (image)"
-                             Width="480" HorizontalAlignment="Left"
-                             PlaceholderText="google/gemini-2.5-flash-image-preview"
-                             Text="{x:Bind ViewModel.ArtistOpenRouterImageModel, Mode=TwoWay}"/>
-
-                    <TextBox Header="Модель Ollama (image-capable)"
-                             Width="480" HorizontalAlignment="Left"
-                             PlaceholderText="имя модели из ollama list"
-                             Text="{x:Bind ViewModel.ArtistOllamaImageModel, Mode=TwoWay}"/>
-
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="💾 Сохранить"
-                                Style="{ThemeResource AccentButtonStyle}"
-                                Command="{x:Bind ViewModel.SaveArtistImageCommand}"/>
-                        <TextBlock Text="{x:Bind ViewModel.ArtistImageStatus, Mode=OneWay}"
-                                   VerticalAlignment="Center" Opacity="0.75"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
+                </ScrollViewer>
+            </PivotItem>
 
             <!-- ============= TEMPLATES ============= -->
-            <Border BorderThickness="1" CornerRadius="8" Padding="16"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                <StackPanel Spacing="10">
-                    <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Шаблоны dotnet new"
-                                   FontSize="18" FontWeight="SemiBold"
-                                   VerticalAlignment="Center"/>
-                        <ProgressRing Grid.Column="1" Width="20" Height="20"
-                                           IsActive="{x:Bind ViewModel.IsTemplatesLoading, Mode=OneWay}"
-                                           VerticalAlignment="Center"/>
-                        <Button Grid.Column="2" Content="🔄 Проверить снова"
-                                Command="{x:Bind ViewModel.RefreshTemplatesCommand}"/>
-                    </Grid>
-
-                    <TextBlock Text="{x:Bind ViewModel.TemplatesStatus, Mode=OneWay}" Opacity="0.7"/>
-
-                     <ItemsRepeater ItemsSource="{x:Bind ViewModel.Templates}">
-                        <ItemsRepeater.Layout>
-                            <StackLayout Orientation="Vertical" Spacing="6"/>
-                        </ItemsRepeater.Layout>
-                        <DataTemplate x:DataType="viewmodels:TemplateStatusItem">
-                            <Border Padding="10" CornerRadius="6"
-                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+            <PivotItem x:Uid="Settings_Tab_Templates" Header="Templates">
+                <ScrollViewer>
+                    <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="10">
                                 <Grid ColumnSpacing="12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock FontWeight="SemiBold">
-                                            <Run Text="{x:Bind DisplayName}"/>
-                                            <Run Text="  •  "/>
-                                            <Run Text="{x:Bind DotnetNewName}" FontFamily="Consolas"/>
-                                        </TextBlock>
-                                        <TextBlock Opacity="0.7" FontSize="12"
-                                                   Text="{x:Bind InstallPackage}"/>
-                                        <TextBlock Opacity="0.85" Text="{x:Bind Status, Mode=OneWay}"/>
-                                    </StackPanel>
-                                    <Button Grid.Column="1" Content="⬇ Установить"
-                                            Command="{Binding ElementName=RootPage, Path=ViewModel.InstallTemplateCommand}"
-                                            CommandParameter="{x:Bind}"/>
+                                    <TextBlock Text="dotnet new templates"
+                                               FontSize="18" FontWeight="SemiBold"
+                                               VerticalAlignment="Center"/>
+                                    <ProgressRing Grid.Column="1" Width="20" Height="20"
+                                                  IsActive="{x:Bind ViewModel.IsTemplatesLoading, Mode=OneWay}"
+                                                  VerticalAlignment="Center"/>
+                                    <Button Grid.Column="2" Content="Refresh"
+                                            Command="{x:Bind ViewModel.RefreshTemplatesCommand}"/>
                                 </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsRepeater>
-                </StackPanel>
-            </Border>
 
-            <!-- ============= TRANSLATION ============= -->
-            <Border BorderThickness="1" CornerRadius="8" Padding="16"
-        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="🌐 Перевод промптов" FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Opacity="0.7" Text="Пишите промпт на своём языке. Отдельная модель переводит его на английский (модели дают лучшие результаты на английском), а ТЗ и отчёт переводятся обратно на ваш язык."/>
+                                <TextBlock Text="{x:Bind ViewModel.TemplatesStatus, Mode=OneWay}" Opacity="0.7"/>
 
-                    <ToggleSwitch Header="Включить перевод"
-                      IsOn="{x:Bind ViewModel.TranslationEnabled, Mode=TwoWay}"
-                      OnContent="включено" OffContent="выключено"/>
-
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <ComboBox Header="Ваш язык"
-                      MinWidth="180"
-                      ItemsSource="{x:Bind ViewModel.SupportedLanguages}"
-                      SelectedItem="{x:Bind ViewModel.UserLanguage, Mode=TwoWay}"/>
-                        <ComboBox Header="Рабочий язык агентов"
-                      MinWidth="180"
-                      ItemsSource="{x:Bind ViewModel.SupportedLanguages}"
-                      SelectedItem="{x:Bind ViewModel.WorkingLanguage, Mode=TwoWay}"/>
-                        <Button Content="💾 Сохранить"
-                    Style="{ThemeResource AccentButtonStyle}"
-                    Command="{x:Bind ViewModel.SaveTranslationCommand}"
-                    VerticalAlignment="Bottom"/>
+                                <ItemsRepeater ItemsSource="{x:Bind ViewModel.Templates}">
+                                    <ItemsRepeater.Layout>
+                                        <StackLayout Orientation="Vertical" Spacing="6"/>
+                                    </ItemsRepeater.Layout>
+                                    <DataTemplate x:DataType="viewmodels:TemplateStatusItem">
+                                        <Border Padding="10" CornerRadius="6"
+                                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock FontWeight="SemiBold">
+                                                        <Run Text="{x:Bind DisplayName}"/>
+                                                        <Run Text="  •  "/>
+                                                        <Run Text="{x:Bind DotnetNewName}" FontFamily="Consolas"/>
+                                                    </TextBlock>
+                                                    <TextBlock Opacity="0.7" FontSize="12"
+                                                               Text="{x:Bind InstallPackage}"/>
+                                                    <TextBlock Opacity="0.85" Text="{x:Bind Status, Mode=OneWay}"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Install"
+                                                        Command="{Binding ElementName=RootPage, Path=ViewModel.InstallTemplateCommand}"
+                                                        CommandParameter="{x:Bind}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsRepeater>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                    <TextBlock Text="{x:Bind ViewModel.TranslationStatus, Mode=OneWay}" Opacity="0.8"/>
-                </StackPanel>
-            </Border>
+                </ScrollViewer>
+            </PivotItem>
 
             <!-- ============= PROMPTS ============= -->
-            <Border BorderThickness="1" CornerRadius="8" Padding="16"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Системные промпты агентов"
-                               FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Opacity="0.7"
-                               Text="Оставьте поле пустым и сохраните — вернётся дефолтный промпт из кода."/>
+            <PivotItem x:Uid="Settings_Tab_Prompts" Header="Prompts">
+                <ScrollViewer>
+                    <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+                        <Border BorderThickness="1" CornerRadius="8" Padding="16"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Agent system prompts"
+                                           FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Opacity="0.7"
+                                           Text="Leave a field empty and save to restore the default prompt from code."/>
 
-                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Prompts}">
-                        <ItemsRepeater.Layout>
-                            <StackLayout Orientation="Vertical" Spacing="8"/>
-                        </ItemsRepeater.Layout>
-                        <DataTemplate x:DataType="viewmodels:PromptItem">
-                            <Expander HorizontalAlignment="Stretch">
-                                <Expander.Header>
-                                    <Grid ColumnSpacing="10" HorizontalAlignment="Stretch">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold"
-                                                   VerticalAlignment="Center"/>
-                                        <Border Grid.Column="1"
-                                                Background="Orange"
-                                                CornerRadius="10" Padding="8,2"
-                                                Visibility="{x:Bind IsCustom, Mode=OneWay}">
-                                            <TextBlock Text="кастомный" FontSize="11" Foreground="Black"/>
-                                        </Border>
-                                    </Grid>
-                                </Expander.Header>
+                                <ItemsRepeater ItemsSource="{x:Bind ViewModel.Prompts}">
+                                    <ItemsRepeater.Layout>
+                                        <StackLayout Orientation="Vertical" Spacing="8"/>
+                                    </ItemsRepeater.Layout>
+                                    <DataTemplate x:DataType="viewmodels:PromptItem">
+                                        <Expander HorizontalAlignment="Stretch">
+                                            <Expander.Header>
+                                                <Grid ColumnSpacing="10" HorizontalAlignment="Stretch">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold"
+                                                               VerticalAlignment="Center"/>
+                                                    <Border Grid.Column="1"
+                                                            Background="Orange"
+                                                            CornerRadius="10" Padding="8,2"
+                                                            Visibility="{x:Bind IsCustom, Mode=OneWay}">
+                                                        <TextBlock Text="custom" FontSize="11" Foreground="Black"/>
+                                                    </Border>
+                                                </Grid>
+                                            </Expander.Header>
 
-                                <StackPanel Spacing="8" Padding="8,12">
-                                    <TextBox AcceptsReturn="True"
-                                             TextWrapping="Wrap"
-                                             MinHeight="160"
-                                             MaxHeight="360"
-                                             FontFamily="Consolas"
-                                             PlaceholderText="{x:Bind Placeholder}"
-                                             Text="{x:Bind Text, Mode=TwoWay}"/>
+                                            <StackPanel Spacing="8" Padding="8,12">
+                                                <TextBox AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         MinHeight="160"
+                                                         MaxHeight="360"
+                                                         FontFamily="Consolas"
+                                                         PlaceholderText="{x:Bind Placeholder}"
+                                                         Text="{x:Bind Text, Mode=TwoWay}"/>
 
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Content="💾 Сохранить"
-                                                Command="{Binding ElementName=RootPage, Path=ViewModel.SavePromptCommand}"
-                                                CommandParameter="{x:Bind}"/>
-                                        <Button Content="↺ Сбросить к дефолту"
-                                                Command="{Binding ElementName=RootPage, Path=ViewModel.ResetPromptCommand}"
-                                                CommandParameter="{x:Bind}"/>
-                                        <TextBlock Text="{x:Bind Status, Mode=OneWay}"
-                                                   VerticalAlignment="Center" Opacity="0.75"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Expander>
-                        </DataTemplate>
-                    </ItemsRepeater>
-                </StackPanel>
-            </Border>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Button Content="Save"
+                                                            Command="{Binding ElementName=RootPage, Path=ViewModel.SavePromptCommand}"
+                                                            CommandParameter="{x:Bind}"/>
+                                                    <Button Content="Reset to default"
+                                                            Command="{Binding ElementName=RootPage, Path=ViewModel.ResetPromptCommand}"
+                                                            CommandParameter="{x:Bind}"/>
+                                                    <TextBlock Text="{x:Bind Status, Mode=OneWay}"
+                                                               VerticalAlignment="Center" Opacity="0.75"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Expander>
+                                    </DataTemplate>
+                                </ItemsRepeater>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </PivotItem>
 
-        </StackPanel>
-    </ScrollViewer>
+        </Pivot>
+    </Grid>
 </Page>

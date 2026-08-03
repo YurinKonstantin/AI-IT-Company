@@ -25,6 +25,12 @@ namespace AI_IT_Company.Views
                 ViewModel.OpenRouterApiKeyInput = box.Password ?? "";
         }
 
+        private void WebSearchKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is PasswordBox box)
+                ViewModel.WebSearchApiKeyInput = box.Password ?? "";
+        }
+
         List<TemplateStatusItem> Items { get; set; } = new();
 
         public async Task RefreshAsync()

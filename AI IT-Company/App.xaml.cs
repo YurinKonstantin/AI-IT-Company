@@ -14,6 +14,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.UI.Xaml;
 using Serilog;
 using System;
+using System.Threading.Tasks;
 using ViewModels;
 
 namespace AI_IT_Company
@@ -70,23 +71,46 @@ namespace AI_IT_Company
 
         protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
+            // Critical path only: settings + UI language, then show window immediately.
             var appSettings = Host.Services.GetRequiredService<AppSettingsStore>();
             await appSettings.InitializeAsync();
 
-            AiProviderServiceCollectionExtensions.ApplyProviderUrlsFromSettings(Host.Services);
+            var uiLang = appSettings.GetUiLanguage();
+            if (!string.IsNullOrWhiteSpace(uiLang))
+                Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = uiLang;
 
-            await Host.Services.GetRequiredService<AgentConfigStore>().InitializeAsync();
-            await Host.Services.GetRequiredService<AgentPromptStore>().InitializeAsync();
-            await Host.Services.GetRequiredService<SessionStore>().InitializeAsync();
-            await Host.Services.GetRequiredService<Core.Freelance.FreelanceJobStore>().InitializeAsync();
-            await Host.Services.GetRequiredService<Core.Freelance.FreelanceStatsService>().EnsureSchemaAsync();
+            AiProviderServiceCollectionExtensions.ApplyProviderUrlsFromSettings(Host.Services);
 
             MainWindow = new MainWindow();
             MainWindow.Activate();
+            if (MainWindow is MainWindow mw)
+                mw.SetStartupStatus("Loading services…");
+
+            try
+            {
+                // Remaining stores — after first paint so the app does not look frozen.
+                await Task.WhenAll(
+                    Host.Services.GetRequiredService<AgentConfigStore>().InitializeAsync(),
+                    Host.Services.GetRequiredService<AgentPromptStore>().InitializeAsync(),
+                    Host.Services.GetRequiredService<SessionStore>().InitializeAsync(),
+                    Host.Services.GetRequiredService<CorrectionLessonStore>().InitializeAsync(),
+                    Host.Services.GetRequiredService<Core.Freelance.FreelanceJobStore>().InitializeAsync());
+
+                await Host.Services.GetRequiredService<Core.Freelance.FreelanceStatsService>().EnsureSchemaAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Deferred store init failed: " + ex);
+                if (MainWindow is MainWindow mwErr)
+                    mwErr.SetStartupStatus("Startup error — see logs");
+            }
 
             Host.Services
                 .GetRequiredService<AI_IT_Company.Services.PipelineRunService>()
                 .AttachUi(MainWindow.DispatcherQueue);
+
+            if (MainWindow is MainWindow ready)
+                ready.MarkServicesReady();
         }
     }
 }

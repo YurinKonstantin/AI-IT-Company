@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="App_Brand.Text" xml:space="preserve"><value>AI IT-Company</value></data>
+  <data name="Nav_Agent.Content" xml:space="preserve"><value>Студия</value></data>
+  <data name="Nav_Review.Content" xml:space="preserve"><value>Правки</value></data>
+  <data name="Nav_Runs.Content" xml:space="preserve"><value>Запуски</value></data>
+  <data name="Nav_AgentsModels.Content" xml:space="preserve"><value>Агенты и модели</value></data>
+  <data name="Nav_More.Content" xml:space="preserve"><value>Ещё</value></data>
+  <data name="Nav_Freelance.Content" xml:space="preserve"><value>Автопилот</value></data>
+  <data name="Nav_Logs.Content" xml:space="preserve"><value>Логи</value></data>
+  <data name="Nav_Help.Content" xml:space="preserve"><value>Справка</value></data>
+  <data name="Nav_Settings.Content" xml:space="preserve"><value>Настройки</value></data>
+  <data name="Agent_Title.Text" xml:space="preserve"><value>Студия</value></data>
+  <data name="Studio_Banner.Text" xml:space="preserve"><value>Студия — опишите идею, агенты реализуют. Apply/Reject на вкладке Правки.</value></data>
+  <data name="Autopilot_Title.Text" xml:space="preserve"><value>Автопилот (биржа + GitHub bounties)</value></data>
+  <data name="Autopilot_Banner.Text" xml:space="preserve"><value>Автопилот — охота и оценка заданий; Accept только запускает внутренний пайплайн (без отклика на биржу).</value></data>
+  <data name="Agent_ClearTimeline.Content" xml:space="preserve"><value>Очистить</value></data>
+  <data name="Agent_Side_Run.Text" xml:space="preserve"><value>Запуск</value></data>
+  <data name="Agent_Side_Progress.Text" xml:space="preserve"><value>Прогресс</value></data>
+  <data name="Agent_OpenFolder.Content" xml:space="preserve"><value>Папка</value></data>
+  <data name="Agent_RetryStage.Content" xml:space="preserve"><value>Повторить этап</value></data>
+  <data name="Agent_BuildFix_Title.Text" xml:space="preserve"><value>Сборка не исправлена</value></data>
+  <data name="Agent_BuildFix_Rollback.Content" xml:space="preserve"><value>Откатить</value></data>
+  <data name="Agent_BuildFix_Continue.Content" xml:space="preserve"><value>Исправил — продолжить</value></data>
+  <data name="Agent_BuildFix_Proceed.Content" xml:space="preserve"><value>Далее с ошибкой</value></data>
+  <data name="Agent_OpenReview.Text" xml:space="preserve"><value>К правкам</value></data>
+  <data name="Agent_Browse.Content" xml:space="preserve"><value>Обзор…</value></data>
+  <data name="Agent_ClearAttach.Content" xml:space="preserve"><value>Очистить</value></data>
+  <data name="Agent_Prompt.PlaceholderText" xml:space="preserve"><value>Опишите задачу… (@file путь / @folder путь)</value></data>
+  <data name="Agent_ProjectPath.PlaceholderText" xml:space="preserve"><value>Папка проекта</value></data>
+  <data name="Agent_Send.Content" xml:space="preserve"><value>Отправить</value></data>
+  <data name="Agent_Stop.Content" xml:space="preserve"><value>Стоп</value></data>
+  <data name="Runs_Title.Text" xml:space="preserve"><value>Запуски</value></data>
+  <data name="Runs_Subtitle.Text" xml:space="preserve"><value>История сессий. Живой прогресс — на странице Агент.</value></data>
+  <data name="Runs_OpenAgent.Content" xml:space="preserve"><value>К агенту</value></data>
+  <data name="Runs_History.Text" xml:space="preserve"><value>История</value></data>
+  <data name="Runs_Refresh.Content" xml:space="preserve"><value>Обновить</value></data>
+  <data name="Lab_Tab_Agents.Header" xml:space="preserve"><value>Агенты</value></data>
+  <data name="Lab_Tab_Models.Header" xml:space="preserve"><value>Модели</value></data>
+  <data name="Settings_Title.Text" xml:space="preserve"><value>Настройки</value></data>
+  <data name="Settings_Tab_Providers.Header" xml:space="preserve"><value>Провайдеры</value></data>
+  <data name="Settings_Tab_Pipeline.Header" xml:space="preserve"><value>Пайплайн</value></data>
+  <data name="Settings_Tab_Language.Header" xml:space="preserve"><value>Язык</value></data>
+  <data name="Settings_Tab_Editor.Header" xml:space="preserve"><value>Редактор</value></data>
+  <data name="Settings_Tab_Freelance.Header" xml:space="preserve"><value>Фриланс</value></data>
+  <data name="Settings_Tab_Artist.Header" xml:space="preserve"><value>Художник</value></data>
+  <data name="Settings_Tab_Templates.Header" xml:space="preserve"><value>Шаблоны</value></data>
+  <data name="Settings_Tab_Prompts.Header" xml:space="preserve"><value>Промпты</value></data>
+  <data name="Review_Title.Text" xml:space="preserve"><value>Правки (Apply / Reject)</value></data>
+  <data name="ModeHint_Auto" xml:space="preserve"><value>Авто: Interpreter выберет режим. Папка нужна для задач по существующему коду.</value></data>
+  <data name="ModeHint_Create" xml:space="preserve"><value>Создание нового проекта. Папка не обязательна — результат в Output.</value></data>
+  <data name="ModeHint_Improve" xml:space="preserve"><value>Улучшение: укажите папку проекта. Диффы на вкладке Правки.</value></data>
+  <data name="ModeHint_Fix" xml:space="preserve"><value>Исправление ошибки: нужна папка проекта. Смотрите build_log при Failed.</value></data>
+  <data name="ModeHint_Document" xml:space="preserve"><value>Документирование: нужна папка. README / ARCHITECTURE без переписи кода.</value></data>
+  <data name="ModeHint_Analyze" xml:space="preserve"><value>Анализ: нужна папка. Результат — ANALYSIS.md без правок кода.</value></data>
+  <data name="ModeHint_Plan" xml:space="preserve"><value>Только ТЗ / архитектура: код не генерируется.</value></data>
+  <data name="Timeline_You" xml:space="preserve"><value>Вы</value></data>
+  <data name="Settings_UiLanguageSaved" xml:space="preserve"><value>Язык интерфейса сохранён. Перезапустите приложение, чтобы обновить все строки.</value></data>
+</root>

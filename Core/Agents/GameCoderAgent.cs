@@ -1,5 +1,6 @@
 ﻿using Core.Configuration;
 using Core.Contracts;
+using Core.Services;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Linq;
@@ -51,8 +52,9 @@ public sealed class GameCoderAgent : AgentBase
     """;
 
     public GameCoderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
+                          CorrectionLessonStore lessons, AppSettingsStore appSettings,
                           ILogger<GameCoderAgent> logger)
-        : base(factory, configStore, promptStore, logger) { }
+        : base(factory, configStore, promptStore, logger, lessons, appSettings) { }
 
     protected override string BuildUserPrompt(AgentContext ctx)
         => StageContextBuilder.Build(ctx, coderRole: "Кодер-Геймдев (MonoGame.Framework.DesktopGL)");

@@ -17,14 +17,7 @@ public static class DotnetRunner
         var cmd = $"dotnet {args}";
         TerminalSink?.Invoke($"$ {cmd}  (cwd: {workingDir})");
 
-        var psi = new ProcessStartInfo("dotnet", args)
-        {
-            WorkingDirectory = workingDir,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var psi = CreateDotnetStartInfo(args, workingDir);
         using var p = Process.Start(psi)!;
         var so = p.StandardOutput.ReadToEndAsync(ct);
         var se = p.StandardError.ReadToEndAsync(ct);
@@ -39,6 +32,28 @@ public static class DotnetRunner
         TerminalSink?.Invoke($"exit {p.ExitCode}");
 
         return (p.ExitCode, stdout, stderr);
+    }
+
+    private static ProcessStartInfo CreateDotnetStartInfo(string args, string workingDir)
+    {
+        var psi = new ProcessStartInfo("dotnet", args)
+        {
+            WorkingDirectory = workingDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            // UTF-8 so MSBuild messages aren't mojibake on non-English Windows.
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
+        };
+
+        // Force English CLI / MSBuild messages for reliable ErrorFixer parsing.
+        psi.Environment["DOTNET_CLI_UI_LANGUAGE"] = "en";
+        psi.Environment["VSLANG"] = "1033";
+        psi.Environment["PreferredUILang"] = "en-US";
+
+        return psi;
     }
 
     private static string Truncate(string s, int max)
@@ -70,14 +85,7 @@ public static class DotnetRunner
                       ?? Environment.CurrentDirectory;
         var args = $"run --project \"{csprojPath}\" --nologo";
 
-        var psi = new ProcessStartInfo("dotnet", args)
-        {
-            WorkingDirectory = workingDir,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var psi = CreateDotnetStartInfo(args, workingDir);
 
         using var p = Process.Start(psi)!;
         var sbOut = new StringBuilder();
@@ -103,12 +111,10 @@ public static class DotnetRunner
             try { await Task.WhenAll(readOut, readErr); } catch { /* ignore */ }
 
             var log = sbOut + "\n" + sbErr + $"\n[exit={p.ExitCode}]";
-            // Консольные игры/утилиты могут завершиться быстро с 0 — это OK.
             return (p.ExitCode == 0, log);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            // Дожили до timeout — для WinUI/MonoGame это нормальный smoke.
             try
             {
                 if (!p.HasExited) p.Kill(entireProcessTree: true);

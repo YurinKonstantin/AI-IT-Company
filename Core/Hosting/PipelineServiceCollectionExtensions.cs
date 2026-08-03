@@ -21,6 +21,8 @@ public static class PipelineServiceCollectionExtensions
         s.AddSingleton<AgentConfigStore>();
         s.AddSingleton<AgentPromptStore>();
         s.AddSingleton<PendingChangeService>();
+        s.AddSingleton<BuildFixGateService>();
+        s.AddSingleton<CorrectionLessonStore>();
         s.AddSingleton<SessionStore>();
         s.AddSingleton<FreelanceJobStore>();
         s.AddSingleton<FreelanceStatsService>();

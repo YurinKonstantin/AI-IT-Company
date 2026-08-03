@@ -1,5 +1,6 @@
 ﻿using Core.Configuration;
 using Core.Contracts;
+using Core.Services;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -60,8 +61,10 @@ namespace Core.Agents
         public FullstackCoderAgent(IAiProviderFactory factory,
                                    AgentConfigStore configStore,
                                    AgentPromptStore promptStore,
+                                   CorrectionLessonStore lessons,
+                                   AppSettingsStore appSettings,
                                    ILogger<FullstackCoderAgent> logger)
-            : base(factory, configStore, promptStore, logger) { }
+            : base(factory, configStore, promptStore, logger, lessons, appSettings) { }
 
         protected override string BuildUserPrompt(AgentContext ctx)
             => StageContextBuilder.Build(ctx,

@@ -1,5 +1,4 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
@@ -8,6 +7,12 @@
   xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10"
   IgnorableNamespaces="uap rescap systemai">
 
+  <!--
+    After reserving the Store name and associating the app in Visual Studio /
+    Partner Center, replace Identity Name + Publisher with the values from
+    the association (Package.appxmanifest will be updated by "Associate App
+    with the Store").
+  -->
   <Identity
     Name="01eb9876-7a72-429e-9628-b2b31ff3efb5"
     Publisher="CN=yurin"
@@ -27,7 +32,9 @@
   </Dependencies>
 
   <Resources>
-    <Resource Language="x-generate"/>
+    <Resource Language="en-US"/>
+    <Resource Language="ru-RU"/>
+    <Resource Language="zh-Hans"/>
   </Resources>
 
   <Applications>
@@ -36,7 +43,7 @@
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
         DisplayName="AI IT-Company"
-        Description="AI IT-Company"
+        Description="Local multi-agent AI company for Windows: create, improve, fix, and document .NET projects with Ollama / LM Studio / ONNX / OpenRouter."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
@@ -46,6 +53,11 @@
     </Application>
   </Applications>
 
+  <!--
+    runFullTrust: required for local dotnet CLI, git, folder pickers, explorer,
+    and writing project output under the user profile.
+    systemAIModels: optional Windows on-device AI when available.
+  -->
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
     <systemai:Capability Name="systemAIModels"/>

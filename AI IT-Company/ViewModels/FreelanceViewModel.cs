@@ -1,7 +1,9 @@
 using AI_IT_Company.Services;
+using Ai.Freelance;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Core;
+using Core.Configuration;
 using Core.Contracts;
 using Core.Freelance;
 using Core.Services;
@@ -21,6 +23,8 @@ public partial class FreelanceViewModel : ObservableObject
     private readonly FreelanceJobStore _store;
     private readonly FreelanceStatsService _stats;
     private readonly ITranslationService _translator;
+    private readonly AppSettingsStore _settings;
+    private readonly GitHubBountyMarketplaceAdapter _github;
     public PipelineRunService Runner { get; }
 
     public ObservableCollection<FreelanceJobItemVm> Feed { get; } = new();
@@ -44,13 +48,17 @@ public partial class FreelanceViewModel : ObservableObject
         FreelanceJobStore store,
         FreelanceStatsService stats,
         PipelineRunService runner,
-        ITranslationService translator)
+        ITranslationService translator,
+        AppSettingsStore settings,
+        GitHubBountyMarketplaceAdapter github)
     {
         _hunt = hunt;
         _store = store;
         _stats = stats;
         Runner = runner;
         _translator = translator;
+        _settings = settings;
+        _github = github;
         Runner.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(PipelineRunService.IsRunning) && !Runner.IsRunning)
@@ -199,6 +207,42 @@ public partial class FreelanceViewModel : ObservableObject
         {
             StatusText = "Пайплайн уже запущен — дождитесь завершения.";
             return;
+        }
+
+        // Opt-in GitHub draft comment — never without the settings flag; skip in simulation.
+        if (string.Equals(job.Source, "GitHub", StringComparison.OrdinalIgnoreCase)
+            && _settings.GetFreelanceGitHubDraftComment()
+            && !_hunt.IsSimulationOnly)
+        {
+            try
+            {
+                var offer = new FreelanceJobOffer
+                {
+                    ExternalId = job.ExternalId,
+                    Source = job.Source,
+                    Title = job.Title,
+                    Description = job.Description,
+                    Url = job.Url
+                };
+                var body = $"""
+                    Draft interest from AI IT-Company (automated, please review before treating as a bid).
+
+                    **Task:** {job.Title}
+                    We are evaluating feasibility and may open a PR if the scope fits.
+
+                    — posted only because "GitHub draft comment on Accept" is enabled in settings.
+                    """;
+                var (ok, msg) = await _github.PostDraftCommentAsync(offer, body);
+                await _stats.WriteAuditAsync(ok ? "GitHubDraftComment" : "GitHubDraftCommentFail",
+                    job.Id, msg);
+                if (!ok)
+                    StatusText = "GitHub draft comment failed: " + msg + " — pipeline continues.";
+            }
+            catch (Exception ex)
+            {
+                await _stats.WriteAuditAsync("GitHubDraftCommentFail", job.Id, ex.Message);
+                StatusText = "GitHub draft comment error: " + ex.Message;
+            }
         }
 
         var projectId = "fl" + Guid.NewGuid().ToString("N")[..6];

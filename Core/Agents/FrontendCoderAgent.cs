@@ -1,6 +1,7 @@
 ﻿using Core.Agents;
 using Core.Configuration;
 using Core.Contracts;
+using Core.Services;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -53,8 +54,9 @@ public sealed class FrontendCoderAgent : AgentBase
     """;
 
     public FrontendCoderAgent(IAiProviderFactory factory, AgentConfigStore configStore, AgentPromptStore promptStore,
+                              CorrectionLessonStore lessons, AppSettingsStore appSettings,
                               ILogger<FrontendCoderAgent> logger)
-        : base(factory, configStore, promptStore, logger) { }
+        : base(factory, configStore, promptStore, logger, lessons, appSettings) { }
 
     protected override string BuildUserPrompt(AgentContext ctx) => StageContextBuilder.Build(ctx, coderRole: "Кодер-Фронтенд (WinUI 3, XAML, MVVM/CommunityToolkit.Mvvm)");
 

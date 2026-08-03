@@ -13,6 +13,8 @@ public sealed class WindowsCredentialStore
     public const string GitHubPatResource = "AiItCompany/GitHubPat";
     public const string FlRuApiResource = "AiItCompany/FlRuApi";
     public const string KworkApiResource = "AiItCompany/KworkApi";
+    public const string TavilyResource = "AiItCompany/Tavily";
+    public const string BraveSearchResource = "AiItCompany/BraveSearch";
     private const string DefaultUserName = "api-key";
 
     public void SetSecret(string resource, string secret)

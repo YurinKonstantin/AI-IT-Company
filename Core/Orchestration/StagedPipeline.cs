@@ -1,6 +1,7 @@
 ﻿using Build;
 using Core.Contracts;
 using Core.Models;
+using Core.Services;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -21,14 +22,23 @@ namespace Core.Orchestration
         private readonly Dictionary<AgentRole, IAgent> _agents;
         private readonly ILogger<StagedPipeline> _logger;
         private readonly Configuration.AppSettingsStore _settings;
+        private readonly Configuration.AgentConfigStore _agentConfig;
+        private readonly BuildFixGateService _buildFixGate;
 
         public Channel<PipelineEvent> Events { get; } =
             Channel.CreateUnbounded<PipelineEvent>(new UnboundedChannelOptions { SingleReader = false });
 
-        public StagedPipeline(IEnumerable<IAgent> agents, Configuration.AppSettingsStore settings, ILogger<StagedPipeline> logger)
+        public StagedPipeline(
+            IEnumerable<IAgent> agents,
+            Configuration.AppSettingsStore settings,
+            Configuration.AgentConfigStore agentConfig,
+            BuildFixGateService buildFixGate,
+            ILogger<StagedPipeline> logger)
         {
             _agents = agents.ToDictionary(a => a.Role);
             _settings = settings;
+            _agentConfig = agentConfig;
+            _buildFixGate = buildFixGate;
             _logger = logger;
         }
 
@@ -36,18 +46,31 @@ namespace Core.Orchestration
         {
             AttachEventSink(ctx);
 
-            // 1) Интерпретация задачи (режим UI с ModeLocked не перезаписывается)
-            await RunAgent(AgentRole.Interpreter, ctx, ct);
+            // Skip Interpreter when mode is locked and type already known (Document/Analyze),
+            // saving an Ollama round-trip that often OOMs on weak PCs.
+            bool skipInterpreter = ctx.ModeLocked
+                && ctx.Type != ProjectType.Unknown
+                && ctx.Mode is WorkMode.Document or WorkMode.Analyze;
 
-            var intent = ctx.SharedData.GetValueOrDefault("interpreter_intent", "?");
-            var conf = ctx.SharedData.GetValueOrDefault("interpreter_confidence", "?");
-            await Emit(AgentRole.Interpreter, "info",
-                $"Определено: {ctx.Type} · {ctx.Mode} · intent={intent} (confidence {conf})");
-
-            if (ctx.SharedData.GetValueOrDefault("interpreter_low_confidence") == "true")
+            if (!skipInterpreter)
             {
-                await Emit(AgentRole.Interpreter, "warn",
-                    "Низкая уверенность классификации — fallback: CreateNew. Уточните задачу или выберите режим вручную.");
+                await RunAgent(AgentRole.Interpreter, ctx, ct);
+
+                var intent = ctx.SharedData.GetValueOrDefault("interpreter_intent", "?");
+                var conf = ctx.SharedData.GetValueOrDefault("interpreter_confidence", "?");
+                await Emit(AgentRole.Interpreter, "info",
+                    $"Определено: {ctx.Type} · {ctx.Mode} · intent={intent} (confidence {conf})");
+
+                if (ctx.SharedData.GetValueOrDefault("interpreter_low_confidence") == "true")
+                {
+                    await Emit(AgentRole.Interpreter, "warn",
+                        "Низкая уверенность классификации — fallback: CreateNew. Уточните задачу или выберите режим вручную.");
+                }
+            }
+            else
+            {
+                await Emit(AgentRole.Interpreter, "info",
+                    $"Interpreter пропущен (ModeLocked={ctx.Mode}, type={ctx.Type})");
             }
 
             bool needsExisting = ctx.Mode is WorkMode.Improve or WorkMode.FixError
@@ -277,10 +300,11 @@ namespace Core.Orchestration
             await RunAgent(AgentRole.Builder, ctx, ct);
 
             bool ok = ctx.SharedData.GetValueOrDefault("build_ok") == "true";
+            var maxAttempts = _settings.GetMaxBuildFixAttempts();
             if (!ok)
             {
                 // Классический цикл исправлений по логу сборки.
-                ok = await ContinueFixLoopAsync(ctx, maxAttempts: 5, ct);
+                ok = await ContinueFixLoopAsync(ctx, maxAttempts: Math.Max(1, maxAttempts), ct);
             }
             else
             {
@@ -288,7 +312,8 @@ namespace Core.Orchestration
                 // даём Fixer один (или несколько) проходов по описанию.
                 await Emit(AgentRole.ErrorFixer, "info",
                     "Сборка успешна — исправляем по описанию пользователя.");
-                for (int i = 0; i < 3; i++)
+                var descriptionPasses = Math.Clamp(maxAttempts, 1, 5);
+                for (int i = 0; i < descriptionPasses; i++)
                 {
                     ctx.SharedData.Remove("fix_code");
                     // Сохраняем user report + последний build log.
@@ -307,7 +332,7 @@ namespace Core.Orchestration
                     if (!fixedAny) break;
                     if (!ok)
                     {
-                        ok = await ContinueFixLoopAsync(ctx, maxAttempts: 3, ct);
+                        ok = await ContinueFixLoopAsync(ctx, maxAttempts: Math.Max(1, maxAttempts), ct);
                         break;
                     }
                 }
@@ -349,7 +374,7 @@ namespace Core.Orchestration
         private async Task RunAnalyzeAsync(AgentContext ctx, string repo, CancellationToken ct)
         {
             await Emit(AgentRole.Analyst, "info", "Режим Analyze: код не изменяется, сборка не запускается.");
-            RefreshProjectScan(ctx, repo);
+            RefreshProjectScan(ctx, repo, forceTypeFromScan: true);
             ctx.SharedData["project_metrics"] = ProjectMetrics.CollectReport(repo, ctx.Files);
             await Emit(AgentRole.Analyst, "scan",
                 $"Файлов: {ctx.Files.Count}; тип: {ctx.Type}");
@@ -383,7 +408,7 @@ namespace Core.Orchestration
         {
             await Emit(AgentRole.Documenter, "info", "Режим документирования: кодеры и сборка пропущены.");
 
-            RefreshProjectScan(ctx, repo);
+            RefreshProjectScan(ctx, repo, forceTypeFromScan: true);
             await Emit(AgentRole.Documenter, "scan",
                 $"Файлов: {ctx.Files.Count}; тип: {ctx.Type}");
 
@@ -414,7 +439,7 @@ namespace Core.Orchestration
             await RunAgent(AgentRole.Secretary, ctx, ct);
         }
 
-        private static void RefreshProjectScan(AgentContext ctx, string repo)
+        private static void RefreshProjectScan(AgentContext ctx, string repo, bool forceTypeFromScan = false)
         {
             if (!Directory.Exists(repo)) return;
 
@@ -422,12 +447,13 @@ namespace Core.Orchestration
             ctx.Files.Clear();
             ctx.Files.AddRange(scan.Files);
             ctx.SharedData["project_structure"] = scan.StructureTree;
-            ctx.SharedData["project_previews"] = ProjectScanner.BuildFilePreviews(repo, scan.Files);
+            ctx.SharedData["project_previews"] = ProjectScanner.BuildFilePreviews(
+                repo, scan.Files, maxFiles: 18, maxCharsPerFile: 1800, maxTotalChars: 14_000);
 
-            if (ctx.Type == ProjectType.Unknown
-                && Enum.TryParse<ProjectType>(scan.Type, out var pt))
+            if (Enum.TryParse<ProjectType>(scan.Type, out var pt) && pt != ProjectType.Unknown)
             {
-                ctx.Type = pt;
+                if (forceTypeFromScan || ctx.Type == ProjectType.Unknown)
+                    ctx.Type = pt;
             }
         }
 
@@ -517,8 +543,9 @@ namespace Core.Orchestration
                 }
                 else
                 {
-                    // Сборка + до 3 попыток авто-исправления
-                    buildOk = await BuildWithFixesAsync(ctx, maxAttempts: 3, ct);
+                    // Сборка + N попыток авто-исправления (из настроек)
+                    var maxAttempts = _settings.GetMaxBuildFixAttempts();
+                    buildOk = await BuildWithFixesAsync(ctx, maxAttempts, ct);
                 }
 
                 // Чеклист приёмки: test + MonoGame smoke.
@@ -537,6 +564,16 @@ namespace Core.Orchestration
                     }
                 }
 
+                if (!buildOk)
+                {
+                    buildOk = await TryRecoverAfterBuildFixExhaustedAsync(
+                        ctx, next, ct);
+                }
+
+                var proceedWithError =
+                    ctx.SharedData.GetValueOrDefault("build_fix_proceed") == "true";
+                ctx.SharedData.Remove("build_fix_proceed");
+
                 if (buildOk)
                 {
                     string? sha = null;
@@ -545,9 +582,26 @@ namespace Core.Orchestration
 
                     next.GitCommitSha = sha;
                     next.Status = StageStatus.Succeeded;
+                    next.FailReason = null;
                     if (!string.IsNullOrWhiteSpace(sha)) lastSuccessSha = sha;
 
                     await Emit(AgentRole.Builder, "stage-ok", $"{next.Id} → {sha ?? "(no-git)"}");
+                }
+                else if (proceedWithError)
+                {
+                    // Код не откатываем; этап считаем пройденным с пометкой, зависимые могут идти дальше.
+                    next.FailReason = "Продолжено с ошибкой сборки: "
+                        + LastLine(ctx.SharedData.GetValueOrDefault("build_log", ""));
+                    next.Status = StageStatus.Succeeded;
+                    if (gitAvailable)
+                    {
+                        var sha = await GitService.CommitAllAsync(
+                            repo, $"stage({next.Id}): continue with build error", ct);
+                        next.GitCommitSha = sha;
+                        // lastSuccessSha не обновляем — это не зелёная сборка.
+                    }
+                    await Emit(AgentRole.ErrorFixer, "stage-ok",
+                        $"{next.Id} → продолжено с ошибкой сборки");
                 }
                 else
                 {
@@ -555,14 +609,12 @@ namespace Core.Orchestration
                     next.FailReason = LastLine(ctx.SharedData.GetValueOrDefault("build_log", ""));
                     await Emit(AgentRole.ErrorFixer, "stage-fail", $"{next.Id}: {next.FailReason}");
 
-                    // Откат к последнему успешному состоянию
                     if (gitAvailable && !string.IsNullOrWhiteSpace(lastSuccessSha))
                     {
                         await GitService.ResetHardAsync(repo, lastSuccessSha, ct);
                         await Emit(AgentRole.Builder, "git-reset", $"откат к {lastSuccessSha}");
                     }
 
-                    // Все, кто зависел от провалившегося, — Skipped
                     MarkDependentsSkipped(plan, next.Id);
                 }
             }
@@ -611,9 +663,68 @@ namespace Core.Orchestration
 
         // -------------------- СБОРКА С ФИКСАМИ --------------------
 
+        /// <summary>
+        /// После исчерпания авто-попыток: спросить пользователя или сразу откатить.
+        /// Возвращает true, если сборка восстановлена (ручной фикс).
+        /// При proceed выставляет SharedData["build_fix_proceed"]=true и возвращает false.
+        /// </summary>
+        private async Task<bool> TryRecoverAfterBuildFixExhaustedAsync(
+            AgentContext ctx, Stage stage, CancellationToken ct)
+        {
+            ctx.SharedData.Remove("build_fix_proceed");
+            var reason = LastLine(ctx.SharedData.GetValueOrDefault("build_log", ""));
+            var maxAttempts = _settings.GetMaxBuildFixAttempts();
+            var askUser = _settings.GetAskUserOnBuildFixExhausted();
+
+            await Emit(AgentRole.ErrorFixer, "warn",
+                $"{stage.Id}: авто-фикс исчерпан ({maxAttempts} попыток). "
+                + (askUser ? "Ожидание решения пользователя." : "Откат без запроса."));
+
+            if (!askUser)
+                return false;
+
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
+                await Emit(AgentRole.ErrorFixer, "awaiting-build-fix",
+                    $"{stage.Id}: выберите — ручное исправление / далее с ошибкой / откат");
+                var choice = await _buildFixGate.WaitForDecisionAsync(
+                    stage.Id,
+                    $"Этап {stage.Id}: сборка не исправлена за {maxAttempts} попыток.\n"
+                    + "Исправьте код вручную и нажмите «Исправил — продолжить», "
+                    + "либо выберите откат / далее с ошибкой.\n"
+                    + reason,
+                    ctx.SharedData.GetValueOrDefault("build_log", ""),
+                    ct);
+
+                if (choice == BuildFixUserChoice.Rollback)
+                    return false;
+
+                if (choice == BuildFixUserChoice.ProceedWithError)
+                {
+                    ctx.SharedData["build_fix_proceed"] = "true";
+                    await Emit(AgentRole.ErrorFixer, "info",
+                        $"{stage.Id}: переход дальше с ошибкой сборки (без отката)");
+                    return false;
+                }
+
+                await Emit(AgentRole.Builder, "info",
+                    $"{stage.Id}: повторная сборка после ручного исправления…");
+                if (await BuildWithFixesAsync(ctx, maxAttempts, ct))
+                    return true;
+
+                reason = LastLine(ctx.SharedData.GetValueOrDefault("build_log", ""));
+                await Emit(AgentRole.ErrorFixer, "warn",
+                    $"{stage.Id}: сборка всё ещё падает — снова выбор действия. {reason}");
+            }
+        }
+
         private async Task<bool> BuildWithFixesAsync(AgentContext ctx, int maxAttempts, CancellationToken ct)
         {
             await RunAgent(AgentRole.Builder, ctx, ct);
+            if (maxAttempts <= 0)
+                return ctx.SharedData.GetValueOrDefault("build_ok") == "true";
+
             int attempt = 0;
             while (ctx.SharedData.GetValueOrDefault("build_ok") == "false" && attempt++ < maxAttempts)
             {
@@ -671,11 +782,36 @@ namespace Core.Orchestration
                 _logger.LogWarning("Агент {Role} не зарегистрирован — пропуск.", role);
                 return;
             }
-            await Emit(role, "start", "");
+
+            var modelLabel = FormatModelLabel(role);
+            await Emit(role, "start", modelLabel);
             var result = await agent.ExecuteAsync(ctx, ct);
-            await Emit(role,
-                       result.Success ? "done" : "error",
-                       result.Success ? Trim(result.Output) : result.Error ?? "");
+            if (result.Success)
+            {
+                await Emit(role, "done", Trim(result.Output));
+            }
+            else
+            {
+                var err = result.Error ?? "unknown error";
+                if (!err.Contains(modelLabel, StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(modelLabel))
+                    err = $"[{modelLabel}] {err}";
+                await Emit(role, "error", err);
+            }
+        }
+
+        private string FormatModelLabel(AgentRole role)
+        {
+            try
+            {
+                // Builder/Scaffolder don't call LLM — still show configured source for transparency.
+                var s = _agentConfig.Get(role);
+                return $"{s.Source} · {s.ModelName}";
+            }
+            catch
+            {
+                return "";
+            }
         }
 
         private Task Emit(AgentRole role, string kind, string payload)

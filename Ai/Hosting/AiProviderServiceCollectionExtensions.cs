@@ -26,9 +26,11 @@ public static class AiProviderServiceCollectionExtensions
 
         // Freelance marketplace adapters
         s.AddSingleton<IFreelanceMarketplace, DemoMarketplaceAdapter>();
-        s.AddSingleton<IFreelanceMarketplace, GitHubBountyMarketplaceAdapter>();
+        s.AddSingleton<GitHubBountyMarketplaceAdapter>();
+        s.AddSingleton<IFreelanceMarketplace>(sp => sp.GetRequiredService<GitHubBountyMarketplaceAdapter>());
         s.AddSingleton<IFreelanceMarketplace, FlRuMarketplaceAdapter>();
         s.AddSingleton<IFreelanceMarketplace, KworkMarketplaceAdapter>();
+        s.AddSingleton<IWebSearchService, WebSearchService>();
         return s;
     }
 

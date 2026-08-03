@@ -25,15 +25,18 @@
 
 | Вкладка | Tag | Назначение |
 |---------|-----|------------|
-| Чат | `chat` | Запуск конвейера, промпт, `@file`/`@folder`, лента событий |
-| Дашборд | `dashboard` | Прогресс этапов, история сессий |
-| Изменения | `changes` | Apply / Reject диффов (Improve/Fix) |
-| Фриланс | `freelance` | Охота за задачами, score, Accept, оценка, статистика |
-| Агенты | `agents` | Модель/источник на роль, пресеты Compact/Balanced |
-| Модели | `models` | Локальные модели Ollama |
-| Логи | `logs` | Журналы приложения |
-| Настройки | `settings` | Провайдеры, биржа, ревью правок, редактор |
-| Справка | `help` | Встроенный USER_GUIDE |
+| Studio / Автопилот (title bar) | `ProductMode` | Студия = вайб на Agent; Автопилот = биржа (внутренний пайплайн) |
+| Studio (Agent) | `chat` | Workspace: timeline + composer + ворота Review/BuildFix |
+| Autopilot | `freelance` | Охота / score / accept на бирже и GitHub bounties |
+| Review | `changes` | Apply / Reject диффов (пауза пайплайна) |
+| Runs | `dashboard` | История сессий (живой прогресс — на Agent) |
+| Agents & Models | `agents` | Pivot: настройки ролей + Ollama models |
+| More → Logs / Help | `logs` / `help` | Журналы, справка |
+| Settings | `settings` | Pivot: Providers, Pipeline (product mode), Language, … |
+
+UI-локализация: `en-US`, `ru-RU`, `zh-Hans` (`Strings/*/Resources.resw`). Store: [STORE_CHECKLIST.md](STORE_CHECKLIST.md).
+
+**Correction memory (Learning):** уроки WRONG→RIGHT из Agent Teach / Review Reject инъецируются в промпты ErrorFixer и кодеров. Settings → Learning: список, экспорт JSONL, опционально Ollama `/api/create`. См. [LEARNING.md](LEARNING.md).
 
 ---
 
@@ -55,21 +58,21 @@
 
 ## 4. Агенты
 
-| Роль | Когда | Типичная модель (Compact) |
-|------|-------|---------------------------|
-| Interpreter | всегда в начале | coder 7b, low T |
-| Architect | Create/Improve/Plan | coder 7b |
-| Scaffolder | CreateNew | без LLM (`dotnet new`) |
-| Backend / Frontend / Fullstack | scope Backend/Frontend | coder 7b |
-| Artist | scope Game | coder 7b + PNG |
-| GameCoder | scope Game | coder 7b |
-| Tester | scope Tests | coder 7b |
-| Builder | после кодеров / Fix | restore/build/NuGet |
-| ErrorFixer | красная сборка | coder 7b |
-| Documenter / Analyst / UxReviewer | docs / analyze / UI | текстовые 3b–8b |
-| Secretary | конец прогона | отчёт |
+| Роль | Когда | Типичная модель (Compact) | ctx / out |
+|------|-------|---------------------------|-----------|
+| Interpreter | всегда в начале (кроме locked Document/Analyze) | coder 7b, low T | 4k / 1k |
+| Architect | Create/Improve/Plan | coder 7b | 12k / 4k |
+| Scaffolder | CreateNew | без LLM (`dotnet new`) | — |
+| Backend / Frontend / Fullstack | scope Backend/Frontend | coder 7b | 8k / 4k |
+| Artist | scope Game | coder 7b + PNG | 6k / 2k |
+| GameCoder | scope Game | coder 7b | 8k / 4k |
+| Tester | scope Tests | coder 7b | 8k / 3k |
+| Builder | после кодеров / Fix | restore/build/NuGet | — |
+| ErrorFixer | красная сборка | coder 7b | 8k / 3k |
+| Documenter / Analyst / UxReviewer | docs / analyze / UI | llama3.2:3b | 4k / 2k |
+| Secretary | конец прогона | llama3.2:3b | 4k / 2k |
 
-Пресеты: **Compact** (слабый ПК) / **Balanced** (14b на ключевых ролях) — страница Агенты.
+Пресеты: **Compact** (слабый ПК: Fixer/Coder 7b, Docs 3b, ужатый ctx) / **Balanced** (14b кодеры+fixer, 8b docs) — Agents & Models. В timeline и боковой панели Agent показывается `Source · model` на каждом шаге. Ollama `num_ctx` жёстко ≤16k.
 
 ---
 
@@ -106,7 +109,9 @@
 | Оценка ★1–5 | низ формы | outcomes + калибровка EMA |
 | Статистика | дашборд вкладки | win-rate, топ тегов, audit |
 
-Источники: Demo, GitHub bounties, FL.ru/Kwork JSON feed. Авто-accept **не** шлёт отклик на биржу.
+Источники: Demo, GitHub bounties, FL.ru/Kwork JSON feed. Авто-accept **не** шлёт отклик на биржу, пока не включён opt-in **GitHub draft comment on Accept** (только GitHub Issues + PAT).
+
+**Web search (opt-in):** Settings → Providers — Tavily/Brave; сниппеты только у Architect и ErrorFixer.
 
 ---
 

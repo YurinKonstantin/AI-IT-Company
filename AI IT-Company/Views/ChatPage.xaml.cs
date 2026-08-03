@@ -1,37 +1,42 @@
 using AI_IT_Company;
-using ViewModels;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
+using ViewModels;
+using Windows.System;
 
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+namespace Views;
 
-namespace Views
+public sealed partial class ChatPage : Page
 {
-    /// <summary>
-    /// An empty page that can be used on its own or navigated to within a Frame.
-    /// </summary>
-    public sealed partial class ChatPage : Page
+    public ChatViewModel ViewModel { get; }
+
+    public ChatPage()
     {
-        public ChatViewModel ViewModel { get; }
-        //Создай WinUI 3 приложение для заметок с сохранением в SQLite. Функции: добавление, удаление, редактирование, поиск по заголовку.
-        public ChatPage()
+        ViewModel = App.Host.Services.GetRequiredService<ChatViewModel>();
+        InitializeComponent();
+        ViewModel.Timeline.CollectionChanged += (_, _) => ScrollTimelineToEnd();
+    }
+
+    private void ScrollTimelineToEnd()
+    {
+        _ = DispatcherQueue.TryEnqueue(() =>
         {
-            ViewModel = App.Host.Services.GetRequiredService<ChatViewModel>();
-            InitializeComponent();
-        }
+            TimelineScroll.UpdateLayout();
+            TimelineScroll.ChangeView(null, TimelineScroll.ScrollableHeight, null);
+        });
+    }
+
+    private void Page_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key != VirtualKey.Enter) return;
+        var ctrl = Microsoft.UI.Input.InputKeyboardSource
+            .GetKeyStateForCurrentThread(VirtualKey.Control)
+            .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+        // Ctrl+Enter = send (AcceptsReturn keeps Enter for newlines)
+        if (!ctrl) return;
+        if (ViewModel.RunCommand.CanExecute(null))
+            ViewModel.RunCommand.Execute(null);
+        e.Handled = true;
     }
 }

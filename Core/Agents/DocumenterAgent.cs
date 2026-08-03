@@ -82,12 +82,13 @@ public sealed class DocumenterAgent : AgentBase
         var previews = ctx.SharedData.GetValueOrDefault("project_previews", "");
         if (string.IsNullOrWhiteSpace(previews) && ctx.Files.Count > 0)
         {
-            previews = ProjectScanner.BuildFilePreviews(root, ctx.Files);
+            previews = ProjectScanner.BuildFilePreviews(root, ctx.Files,
+                maxFiles: 18, maxCharsPerFile: 1800, maxTotalChars: 14_000);
             ctx.SharedData["project_previews"] = previews;
         }
 
         var fileList = string.Join("\n",
-            ctx.Files.Take(400).Select(f =>
+            ctx.Files.Take(120).Select(f =>
             {
                 try { return Path.GetRelativePath(root, f).Replace('\\', '/'); }
                 catch { return f; }
@@ -102,15 +103,16 @@ public sealed class DocumenterAgent : AgentBase
             File count: {ctx.Files.Count}
 
             === STRUCTURE ===
-            {Truncate(structure, 12000)}
+            {Truncate(structure, 4000)}
 
-            === FILE LIST ===
-            {Truncate(fileList, 8000)}
+            === FILE LIST (sample) ===
+            {Truncate(fileList, 3000)}
 
             === SOURCE PREVIEWS ===
-            {Truncate(previews, 40000)}
+            {Truncate(previews, 14000)}
 
             Produce README.md and ARCHITECTURE.md (and optional docs/API.md) as Markdown blocks with paths.
+            Keep each document concise (aim under 200 lines). Base claims only on sources above.
             """;
     }
 

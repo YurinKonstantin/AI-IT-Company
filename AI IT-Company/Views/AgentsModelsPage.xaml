@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="AI_IT_Company.Views.AgentsModelsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Padding="12">
+        <Pivot x:Name="RootPivot" SelectionChanged="RootPivot_SelectionChanged">
+            <PivotItem x:Uid="Lab_Tab_Agents" Header="Agents">
+                <Frame x:Name="AgentsFrame" Margin="0,8,0,0"/>
+            </PivotItem>
+            <PivotItem x:Uid="Lab_Tab_Models" Header="Models">
+                <Frame x:Name="ModelsFrame" Margin="0,8,0,0"/>
+            </PivotItem>
+        </Pivot>
+    </Grid>
+</Page>

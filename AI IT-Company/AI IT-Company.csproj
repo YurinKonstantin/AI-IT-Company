@@ -15,8 +15,8 @@
 
 	  <SelfContained>true</SelfContained>
 	  <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-	  <PublishSingleFile>true</PublishSingleFile>
-	  <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+	  <!-- Single-file conflicts with MSIX Store packaging; publish profiles control this. -->
+	  <PublishSingleFile>false</PublishSingleFile>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="Views\AgentsConfigPage.xaml" />
@@ -37,6 +37,8 @@
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
     <Content Include="..\docs\USER_GUIDE.md" Link="Docs\USER_GUIDE.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\docs\FEATURES.md" Link="Docs\FEATURES.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\docs\LEARNING.md" Link="Docs\LEARNING.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\docs\STORE_CHECKLIST.md" Link="Docs\STORE_CHECKLIST.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

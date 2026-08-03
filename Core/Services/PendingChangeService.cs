@@ -158,6 +158,25 @@ public sealed class PendingChangeService
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Reject only selected pending items; unblock wait if none remain.</summary>
+    public void RejectSelected()
+    {
+        lock (_gate)
+        {
+            foreach (var c in _changes.Where(x =>
+                         x.Status == PendingChangeStatus.Pending && x.IsSelected))
+                c.Status = PendingChangeStatus.Rejected;
+
+            if (!_changes.Any(c => c.Status == PendingChangeStatus.Pending))
+            {
+                _waitTcs?.TrySetResult(false);
+                _waitTcs = null;
+                AwaitingUserDecision = false;
+            }
+        }
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     private async Task<bool> ApplyInternalAsync(bool all, bool selectedOnly, CancellationToken ct)
     {
         List<PendingChange> batch;

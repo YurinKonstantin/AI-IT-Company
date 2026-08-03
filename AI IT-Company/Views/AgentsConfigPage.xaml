@@ -15,12 +15,12 @@
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
             <Button Content="💾 Сохранить все изменения"
               Command="{x:Bind ViewModel.SaveAllCommand}"/>
-            <Button Content="📦 Пресет Compact (7b)"
+            <Button Content="📦 Пресет Compact (слабый ПК)"
               Command="{x:Bind ViewModel.ApplyCompactPresetCommand}"
-              ToolTipService.ToolTip="Модели для ПК 8–16 GB (README)"/>
-            <Button Content="📦 Пресет Balanced (14b)"
+              ToolTipService.ToolTip="Fixer/Coder 7b, Docs 3b, ctx 4–8k — для 8–16 GB"/>
+            <Button Content="📦 Пресет Balanced"
               Command="{x:Bind ViewModel.ApplyBalancedPresetCommand}"
-              ToolTipService.ToolTip="Модели для ПК 16–24 GB (README)"/>
+              ToolTipService.ToolTip="Кодеры/Fixer 14b, Docs 8b — для 16–24 GB"/>
             <TextBlock Text="{x:Bind ViewModel.GlobalStatus, Mode=OneWay}"
                  VerticalAlignment="Center" Opacity="0.75"/>
         </StackPanel>
@@ -36,14 +36,19 @@
                             <Expander.Header>
                                 <Grid ColumnSpacing="12">
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{x:Bind DisplayName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Opacity="0.7"
+                                    <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                            CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind RoleTier}" FontSize="11" Opacity="0.85"/>
+                                    </Border>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind DisplayName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Opacity="0.7"
                              Text="{x:Bind ModelName, Mode=OneWay}"/>
-                                    <FontIcon Grid.Column="2" Glyph="&#xE7BA;"
+                                    <FontIcon Grid.Column="3" Glyph="&#xE7BA;"
                             Foreground="Orange" FontSize="14"
                             Visibility="{x:Bind IsDirty, Mode=OneWay}"/>
                                 </Grid>
@@ -60,6 +65,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <ComboBox Header="Источник модели"
@@ -69,15 +75,13 @@
                                 <TextBox Grid.Column="1" Header="Название модели"
                          PlaceholderText="Ollama: qwen2.5-coder:7b · OpenRouter: qwen/qwen3-coder:free · ONNX: имя папки"
                          Text="{x:Bind ModelName, Mode=TwoWay}"/>
-                                <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Opacity="0.65" TextWrapping="Wrap"
-                           Text="Ollama — тег модели; OpenRouter — slug (напр. qwen/qwen3-coder:free); ONNX — имя подпапки в папке моделей из Настроек."/>
 
                                 <NumberBox Grid.Row="1" Header="Таймаут ответа, сек (0 = ∞)"
                            Minimum="0" Maximum="86400" SpinButtonPlacementMode="Inline"
                            Value="{x:Bind TimeoutSeconds, Mode=TwoWay}"/>
                                 <NumberBox Grid.Row="1" Grid.Column="1"
-                           Header="Максимальная длина ответа (0 = ∞)"
-                           Minimum="0" Maximum="200000" SpinButtonPlacementMode="Inline"
+                           Header="Макс. длина ответа (токены)"
+                           Minimum="0" Maximum="32000" SpinButtonPlacementMode="Inline"
                            Value="{x:Bind MaxTokens, Mode=TwoWay}"/>
 
                                 <StackPanel Grid.Row="2" Spacing="4">
@@ -95,11 +99,15 @@
                                 </StackPanel>
 
                                 <NumberBox Grid.Row="2" Grid.Column="1"
-                           Header="Контекстное окно (токены)"
-                           Minimum="512" Maximum="1000000" SpinButtonPlacementMode="Inline"
+                           Header="Контекстное окно (токены, Ollama ≤16k)"
+                           Minimum="512" Maximum="32768" SpinButtonPlacementMode="Inline"
                            Value="{x:Bind ContextWindow, Mode=TwoWay}"/>
 
-                                <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8">
+                                <TextBlock Grid.Row="3" Grid.ColumnSpan="2"
+                           Text="{x:Bind RecommendedHint}"
+                           TextWrapping="Wrap" Opacity="0.7" FontSize="12"/>
+
+                                <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8">
                                     <Button Content="💾 Сохранить"
                           Command="{Binding ElementName=RootPage, Path=ViewModel.SaveCommand}"
                           CommandParameter="{x:Bind}"/>
@@ -109,6 +117,9 @@
                                     <TextBlock VerticalAlignment="Center" Opacity="0.75"
                              Text="{x:Bind StatusText, Mode=OneWay}"/>
                                 </StackPanel>
+
+                                <TextBlock Grid.Row="5" Grid.ColumnSpan="2" Opacity="0.55" FontSize="11" TextWrapping="Wrap"
+                           Text="Ollama — тег модели; OpenRouter — slug; ONNX — подпапка. На слабом ПК: Compact + ContextWindow ≤8192."/>
                             </Grid>
                         </Expander>
                     </DataTemplate>

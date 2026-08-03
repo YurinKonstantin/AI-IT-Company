@@ -16,6 +16,7 @@ public partial class ChangesViewModel : ObservableObject
 {
     private readonly PendingChangeService _pending;
     private readonly AppSettingsStore _settings;
+    private readonly CorrectionLessonStore _lessons;
     private DispatcherQueue? _ui;
 
     public ObservableCollection<PendingChangeItemVm> Items { get; } = new();
@@ -24,11 +25,19 @@ public partial class ChangesViewModel : ObservableObject
     [ObservableProperty] private string statusText = "";
     [ObservableProperty] private bool awaitingDecision;
     [ObservableProperty] private string diffText = "";
+    [ObservableProperty] private bool showTeachAfterReject;
+    [ObservableProperty] private string rejectTeachWrong = "";
+    [ObservableProperty] private string rejectTeachRight = "";
+    [ObservableProperty] private string rejectTeachStatus = "";
 
-    public ChangesViewModel(PendingChangeService pending, AppSettingsStore settings)
+    public ChangesViewModel(
+        PendingChangeService pending,
+        AppSettingsStore settings,
+        CorrectionLessonStore lessons)
     {
         _pending = pending;
         _settings = settings;
+        _lessons = lessons;
         _pending.Changed += (_, _) => EnqueueRefresh();
     }
 
@@ -57,8 +66,8 @@ public partial class ChangesViewModel : ObservableObject
             Items.Add(new PendingChangeItemVm(c));
         AwaitingDecision = _pending.AwaitingUserDecision;
         StatusText = AwaitingDecision
-            ? $"Ожидание Apply/Reject · pending {_pending.PendingCount}"
-            : $"Изменений: {snap.Count} · pending {_pending.PendingCount} · режим {_settings.GetReviewChangesMode()}";
+            ? $"Waiting Apply/Reject · pending {_pending.PendingCount}"
+            : $"Changes: {snap.Count} · pending {_pending.PendingCount} · mode {_settings.GetReviewChangesMode()}";
         if (Selected is not null)
         {
             var match = Items.FirstOrDefault(i => i.RelativePath == Selected.RelativePath);
@@ -84,10 +93,76 @@ public partial class ChangesViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void RejectSelected()
+    {
+        foreach (var item in Items)
+            item.Model.IsSelected = item.IsSelected;
+
+        var rejected = Items.Where(i => i.IsSelected && i.Model.Status == PendingChangeStatus.Pending).ToList();
+        _pending.RejectSelected();
+        if (rejected.Count > 0)
+        {
+            RejectTeachWrong = "Rejected AI change: " + string.Join(", ",
+                rejected.Take(5).Select(r => r.RelativePath));
+            RejectTeachRight = "";
+            ShowTeachAfterReject = true;
+            RejectTeachStatus = "Optional: explain the correct approach and save a lesson.";
+        }
+        Refresh();
+    }
+
+    [RelayCommand]
     private void RejectAll()
     {
+        var rejected = Items.Where(i => i.Model.Status == PendingChangeStatus.Pending).ToList();
         _pending.RejectAll();
+        if (rejected.Count > 0)
+        {
+            RejectTeachWrong = "Rejected AI change: " + string.Join(", ",
+                rejected.Take(5).Select(r => r.RelativePath));
+            RejectTeachRight = "";
+            ShowTeachAfterReject = true;
+            RejectTeachStatus = "Optional: explain the correct approach and save a lesson.";
+        }
         Refresh();
+    }
+
+    [RelayCommand]
+    private void SkipRejectTeach()
+    {
+        ShowTeachAfterReject = false;
+        RejectTeachWrong = "";
+        RejectTeachRight = "";
+        RejectTeachStatus = "";
+    }
+
+    [RelayCommand]
+    private async Task SaveRejectTeachAsync()
+    {
+        if (string.IsNullOrWhiteSpace(RejectTeachRight))
+        {
+            RejectTeachStatus = "Fill in how it should be done.";
+            return;
+        }
+
+        var ctx = Selected?.Diff ?? "";
+        try
+        {
+            await _lessons.AddAsync(
+                "Any",
+                "CodeReject",
+                string.IsNullOrWhiteSpace(RejectTeachWrong) ? "(rejected change)" : RejectTeachWrong,
+                RejectTeachRight,
+                ctx);
+            RejectTeachStatus = "Lesson saved.";
+            ShowTeachAfterReject = false;
+            RejectTeachWrong = "";
+            RejectTeachRight = "";
+        }
+        catch (Exception ex)
+        {
+            RejectTeachStatus = "Failed: " + ex.Message;
+        }
     }
 
     [RelayCommand]

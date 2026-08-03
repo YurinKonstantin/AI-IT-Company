@@ -14,18 +14,21 @@ public sealed record ProjectScanResult(
 
 public static class ProjectScanner
 {
+    private const int MaxWalkDepth = 8;
+    private const int MaxSourceFiles = 800;
+
     private static readonly HashSet<string> SourceExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".cs", ".xaml", ".csproj", ".sln", ".md", ".json", ".xml",
         ".props", ".targets", ".resw", ".mgcb", ".yml", ".yaml",
-        ".config", ".razor", ".html", ".css", ".editorconfig",
-        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".ico"
+        ".config", ".razor", ".html", ".css", ".editorconfig"
     };
 
     private static readonly string[] SkipDirNames =
     {
         "bin", "obj", "Backup", ".git", "node_modules", "packages",
-        ".vs", ".idea", "TestResults", "artifacts"
+        ".vs", ".idea", "TestResults", "artifacts", "publish", "dist",
+        ".nuget", "Coverage", ".cursor", ".vscode", "out", "Debug", "Release"
     };
 
     public static (string Type, List<string> Files) Scan(string root)
@@ -41,10 +44,11 @@ public static class ProjectScanner
 
         var files = new List<string>();
         var folders = new List<string>();
+        var hitCap = false;
 
         void Walk(string dir, int depth)
         {
-            if (depth > 12) return;
+            if (hitCap || depth > MaxWalkDepth) return;
 
             IEnumerable<string> subDirs;
             try { subDirs = Directory.EnumerateDirectories(dir); }
@@ -52,6 +56,7 @@ public static class ProjectScanner
 
             foreach (var sub in subDirs)
             {
+                if (hitCap) break;
                 var name = Path.GetFileName(sub);
                 if (SkipDirNames.Any(s => name.Equals(s, StringComparison.OrdinalIgnoreCase)))
                     continue;
@@ -65,6 +70,12 @@ public static class ProjectScanner
 
             foreach (var f in localFiles)
             {
+                if (files.Count >= MaxSourceFiles)
+                {
+                    hitCap = true;
+                    break;
+                }
+
                 var ext = Path.GetExtension(f);
                 if (SourceExtensions.Contains(ext) || string.IsNullOrEmpty(ext) && IsDotFile(f))
                     files.Add(f);
@@ -75,8 +86,8 @@ public static class ProjectScanner
         files.Sort(StringComparer.OrdinalIgnoreCase);
         folders.Sort(StringComparer.OrdinalIgnoreCase);
 
-        var type = DetectType(files);
-        var tree = BuildStructureTree(root, folders, files);
+        var type = DetectType(files, root);
+        var tree = BuildStructureTree(root, folders, files, hitCap);
         return new ProjectScanResult(type, files, folders, tree);
     }
 
@@ -86,57 +97,141 @@ public static class ProjectScanner
         return name is ".gitignore" or ".dockerignore" or ".gitattributes";
     }
 
-    private static string DetectType(List<string> files)
+    /// <summary>
+    /// Scores all .csproj files and picks the strongest app type (WinUI/MonoGame/… over Console libs).
+    /// </summary>
+    private static string DetectType(List<string> files, string root)
     {
-        var csproj = files.FirstOrDefault(f => f.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase));
-        if (csproj is null) return "Unknown";
+        var csprojs = files
+            .Where(f => f.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (csprojs.Count == 0) return "Unknown";
 
-        string txt;
-        try { txt = File.ReadAllText(csproj); }
-        catch { return "Unknown"; }
+        string bestType = "Unknown";
+        int bestScore = -1;
+        var rootName = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
-        if (txt.Contains("MonoGame", StringComparison.OrdinalIgnoreCase)) return "MonogameGame";
-        if (txt.Contains("Microsoft.WindowsAppSDK", StringComparison.OrdinalIgnoreCase)) return "WinUI";
+        foreach (var csproj in csprojs)
+        {
+            string txt;
+            try { txt = File.ReadAllText(csproj); }
+            catch { continue; }
+
+            var (type, score) = ScoreCsproj(csproj, txt, rootName);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestType = type;
+            }
+        }
+
+        return bestType == "Unknown" ? "Console" : bestType;
+    }
+
+    private static (string Type, int Score) ScoreCsproj(string csprojPath, string txt, string? rootName)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(csprojPath);
+        int bonus = 0;
+        if (!string.IsNullOrEmpty(rootName)
+            && fileName.Equals(rootName, StringComparison.OrdinalIgnoreCase))
+            bonus += 5;
+        if (txt.Contains("OutputType>WinExe", StringComparison.OrdinalIgnoreCase)
+            || txt.Contains("OutputType>Exe", StringComparison.OrdinalIgnoreCase))
+            bonus += 3;
+        // Prefer app projects over class libraries.
+        if (txt.Contains("OutputType>Library", StringComparison.OrdinalIgnoreCase)
+            || (!txt.Contains("OutputType", StringComparison.OrdinalIgnoreCase)
+                && txt.Contains("Microsoft.NET.Sdk\"", StringComparison.Ordinal)))
+            bonus -= 2;
+
+        if (txt.Contains("MonoGame", StringComparison.OrdinalIgnoreCase))
+            return ("MonogameGame", 100 + bonus);
+        if (txt.Contains("Microsoft.WindowsAppSDK", StringComparison.OrdinalIgnoreCase)
+            || txt.Contains("UseWinUI", StringComparison.OrdinalIgnoreCase)
+            || txt.Contains("Microsoft.WinUI", StringComparison.OrdinalIgnoreCase))
+            return ("WinUI", 90 + bonus);
         if (txt.Contains("Microsoft.Maui", StringComparison.OrdinalIgnoreCase)
-            || txt.Contains("UseMaui", StringComparison.OrdinalIgnoreCase)) return "Maui";
-        if (txt.Contains("Microsoft.AspNetCore", StringComparison.OrdinalIgnoreCase)) return "Api";
+            || txt.Contains("UseMaui", StringComparison.OrdinalIgnoreCase))
+            return ("Maui", 85 + bonus);
+        if (txt.Contains("Microsoft.NET.Sdk.Web", StringComparison.OrdinalIgnoreCase)
+            || txt.Contains("Microsoft.AspNetCore", StringComparison.OrdinalIgnoreCase))
+            return ("Api", 80 + bonus);
         if (txt.Contains("Microsoft.NET.Sdk.Worker", StringComparison.OrdinalIgnoreCase)
             || txt.Contains("Microsoft.Extensions.Hosting.WindowsServices", StringComparison.OrdinalIgnoreCase)
             || txt.Contains("UseWindowsService", StringComparison.OrdinalIgnoreCase))
-            return "WindowsService";
+            return ("WindowsService", 75 + bonus);
 
-        return "Console";
+        // Generic SDK / console
+        return ("Console", 20 + bonus);
     }
 
-    private static string BuildStructureTree(string root, List<string> folders, List<string> files)
+    private static string BuildStructureTree(
+        string root, List<string> folders, List<string> files, bool truncated)
     {
         var sb = new StringBuilder();
-        sb.AppendLine(Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) + "/");
+        var rootLabel = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        sb.AppendLine(rootLabel + "/");
 
-        var relFolders = folders
-            .Select(f => Path.GetRelativePath(root, f))
-            .Where(r => !r.StartsWith(".."))
+        const int maxDepth = 4;
+        const int maxLines = 250;
+        int lines = 1;
+
+        // Prefer folders that contain source; build nested tree with full relative segments.
+        var relFiles = files
+            .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))
+            .Where(r => !r.StartsWith("..", StringComparison.Ordinal))
             .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
-            .Take(200)
             .ToList();
 
-        foreach (var rel in relFolders)
+        var dirSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rel in relFiles)
         {
-            var depth = rel.Count(c => c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar);
+            var dir = Path.GetDirectoryName(rel)?.Replace('\\', '/');
+            while (!string.IsNullOrEmpty(dir))
+            {
+                dirSet.Add(dir);
+                var parent = Path.GetDirectoryName(dir)?.Replace('\\', '/');
+                dir = parent;
+            }
+        }
+
+        foreach (var relDir in dirSet
+                     .OrderBy(d => d.Count(c => c == '/'))
+                     .ThenBy(d => d, StringComparer.OrdinalIgnoreCase))
+        {
+            var depth = relDir.Count(c => c == '/');
+            if (depth >= maxDepth) continue;
+            if (lines >= maxLines) break;
             sb.Append(new string(' ', (depth + 1) * 2));
-            sb.AppendLine(Path.GetFileName(rel) + "/");
+            sb.AppendLine(relDir + "/");
+            lines++;
         }
 
         sb.AppendLine();
-        sb.AppendLine($"Files ({files.Count}):");
-        foreach (var f in files.Take(400))
+        sb.AppendLine($"Source files ({files.Count}" + (truncated ? ", capped" : "") + "):");
+
+        // Group files under shallow relative paths (not every asset).
+        foreach (var rel in relFiles.Take(200))
         {
-            var rel = Path.GetRelativePath(root, f);
-            if (rel.StartsWith("..")) continue;
-            sb.AppendLine("  " + rel.Replace('\\', '/'));
+            if (lines >= maxLines) break;
+            var depth = rel.Count(c => c == '/');
+            if (depth > maxDepth) continue;
+            sb.AppendLine("  " + rel);
+            lines++;
         }
-        if (files.Count > 400)
-            sb.AppendLine($"  ... and {files.Count - 400} more");
+
+        if (relFiles.Count > 200 || truncated)
+            sb.AppendLine("  ... (truncated)");
+
+        // Module summary: each csproj
+        var csprojs = relFiles.Where(f => f.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)).ToList();
+        if (csprojs.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Projects:");
+            foreach (var c in csprojs.Take(30))
+                sb.AppendLine("  - " + c);
+        }
 
         return sb.ToString();
     }
@@ -144,7 +239,12 @@ public static class ProjectScanner
     /// <summary>
     /// Читает текстовые превью ключевых файлов для промпта документатора.
     /// </summary>
-    public static string BuildFilePreviews(string root, IEnumerable<string> files, int maxFiles = 28, int maxCharsPerFile = 2500, int maxTotalChars = 40000)
+    public static string BuildFilePreviews(
+        string root,
+        IEnumerable<string> files,
+        int maxFiles = 20,
+        int maxCharsPerFile = 2000,
+        int maxTotalChars = 16000)
     {
         var textExt = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {

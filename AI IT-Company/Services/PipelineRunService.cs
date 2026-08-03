@@ -26,6 +26,7 @@ namespace AI_IT_Company.Services
         private readonly ILogger<PipelineRunService> _logger;
         private readonly SessionStore _sessions;
         private readonly PendingChangeService _pending;
+        private readonly BuildFixGateService _buildFixGate;
         private DispatcherQueue? _ui;
 
         private CancellationTokenSource? _cts;
@@ -39,6 +40,7 @@ namespace AI_IT_Company.Services
         [ObservableProperty] private string? currentProjectId;
         [ObservableProperty] private string? currentOutputRoot;
         [ObservableProperty] private string currentAgent = "";
+        [ObservableProperty] private string currentModel = "";
         [ObservableProperty] private string currentStage = "";
         [ObservableProperty] private int totalStages;
         [ObservableProperty] private int completedStages;
@@ -47,10 +49,14 @@ namespace AI_IT_Company.Services
         [ObservableProperty] private DateTime? startedAt;
         [ObservableProperty] private string lastMessage = "";
         [ObservableProperty] private string currentMode = "";
-        [ObservableProperty] private string statusText = "Готов к работе";
+        [ObservableProperty] private string statusText = "Ready";
         [ObservableProperty] private string? lastFailedStageId;
         [ObservableProperty] private bool canRetryLastFailedStage;
         [ObservableProperty] private bool awaitingChangeReview;
+        [ObservableProperty] private bool awaitingBuildFixDecision;
+        [ObservableProperty] private string buildFixPrompt = "";
+        [ObservableProperty] private string buildFixLogSnippet = "";
+        [ObservableProperty] private int pendingChangesCount;
 
         public bool HasActiveProject => !string.IsNullOrEmpty(CurrentProjectId);
         public int ProgressPercent => TotalStages == 0 ? 0
@@ -69,15 +75,22 @@ namespace AI_IT_Company.Services
             ILogger<PipelineRunService> logger,
             ITranslationService translator,
             SessionStore sessions,
-            PendingChangeService pending)
+            PendingChangeService pending,
+            BuildFixGateService buildFixGate)
         {
             _sp = sp;
             _logger = logger;
             _translator = translator;
             _sessions = sessions;
             _pending = pending;
+            _buildFixGate = buildFixGate;
             _pending.Changed += (_, _) =>
-                RunOnUi(() => AwaitingChangeReview = _pending.AwaitingUserDecision);
+                RunOnUi(() =>
+                {
+                    AwaitingChangeReview = _pending.AwaitingUserDecision;
+                    PendingChangesCount = _pending.PendingCount;
+                });
+            _buildFixGate.Changed += (_, _) => RunOnUi(SyncBuildFixGate);
         }
 
         public void AttachUi(DispatcherQueue ui) => _ui = ui;
@@ -89,6 +102,7 @@ namespace AI_IT_Company.Services
             _cts = new CancellationTokenSource();
             _currentContext = ctx;
             _pending.Clear();
+            _buildFixGate.Clear();
 
             var pipeline = _sp.GetRequiredService<StagedPipeline>();
 
@@ -99,6 +113,7 @@ namespace AI_IT_Company.Services
                 CurrentProjectId = ctx.ProjectId;
                 CurrentOutputRoot = ctx.OutputRoot ?? ctx.ProjectPath;
                 CurrentAgent = "";
+                CurrentModel = "";
                 CurrentStage = "";
                 CompletedStages = 0;
                 FailedStages = 0;
@@ -110,6 +125,9 @@ namespace AI_IT_Company.Services
                 CurrentMode = ModeLabel(ctx.Mode);
                 StatusText = $"{CurrentMode}: запуск…";
                 AwaitingChangeReview = false;
+                AwaitingBuildFixDecision = false;
+                BuildFixPrompt = "";
+                PendingChangesCount = 0;
             });
 
             try { await _sessions.StartAsync(ctx); }
@@ -164,9 +182,23 @@ namespace AI_IT_Company.Services
         {
             if (!IsRunning || _cts is null) return;
             try { _cts.Cancel(); } catch { }
+            _buildFixGate.Clear();
             Append(new PipelineEventVm("System", "⏹",
                 "Запрошена остановка… ждём завершения текущего шага.", DateTime.Now));
             RunOnUi(() => StatusText = $"{CurrentMode}: остановка…");
+        }
+
+        public void ResolveBuildFix(BuildFixUserChoice choice)
+        {
+            if (!_buildFixGate.AwaitingDecision) return;
+            Append(new PipelineEventVm("System", "🩹",
+                choice switch
+                {
+                    BuildFixUserChoice.ManualContinue => "Продолжить после ручного исправления",
+                    BuildFixUserChoice.ProceedWithError => "Далее с ошибкой сборки",
+                    _ => "Откат к последней удачной сборке"
+                }, DateTime.Now));
+            _buildFixGate.Resolve(choice);
         }
 
         public void ClearEvents() => RunOnUi(() => Events.Clear());
@@ -225,10 +257,12 @@ namespace AI_IT_Company.Services
                     {
                         IsRunning = false;
                         CurrentAgent = "";
+                        CurrentModel = "";
                         StatusText = FailedStages > 0
                             ? $"{CurrentMode}: завершено с ошибками"
                             : $"{CurrentMode}: готово";
                         AwaitingChangeReview = _pending.AwaitingUserDecision;
+                        SyncBuildFixGate();
                         RefreshCanRetry();
                     });
                 }
@@ -247,6 +281,7 @@ namespace AI_IT_Company.Services
                 {
                     case "start":
                         CurrentAgent = ev.Role.ToString();
+                        CurrentModel = string.IsNullOrWhiteSpace(ev.Payload) ? "" : ev.Payload.Trim();
                         StatusText = ComposeStatus();
                         break;
                     case "scan":
@@ -274,8 +309,13 @@ namespace AI_IT_Company.Services
                         StatusText = $"{CurrentMode}: приёмка провалена";
                         break;
                     case "pending-change":
-                        StatusText = $"{CurrentMode}: ожидание Apply/Reject — {Truncate(ev.Payload, 80)}";
+                        StatusText = $"{CurrentMode}: ⏸ Review — Apply/Reject ({PendingChangesCount})";
                         AwaitingChangeReview = true;
+                        break;
+                    case "awaiting-build-fix":
+                    case "awaiting-manual-fix":
+                        StatusText = $"{CurrentMode}: {Truncate(ev.Payload, 120)}";
+                        SyncBuildFixGate();
                         break;
                     case "terminal":
                         // статус не затираем длинным логом
@@ -319,8 +359,18 @@ namespace AI_IT_Company.Services
         {
             var parts = new System.Collections.Generic.List<string> { CurrentMode };
             if (!string.IsNullOrWhiteSpace(CurrentAgent)) parts.Add(CurrentAgent);
+            if (!string.IsNullOrWhiteSpace(CurrentModel)) parts.Add(CurrentModel);
             if (!string.IsNullOrWhiteSpace(CurrentStage)) parts.Add(CurrentStage);
             return string.Join(" · ", parts);
+        }
+
+        private void SyncBuildFixGate()
+        {
+            AwaitingBuildFixDecision = _buildFixGate.AwaitingDecision;
+            BuildFixPrompt = _buildFixGate.Prompt;
+            BuildFixLogSnippet = _buildFixGate.BuildLogSnippet;
+            if (_buildFixGate.AwaitingDecision && !string.IsNullOrWhiteSpace(_buildFixGate.Prompt))
+                StatusText = $"{CurrentMode}: ⏸ Build fix — choose action";
         }
 
         private void RefreshCanRetry()
@@ -383,6 +433,8 @@ namespace AI_IT_Company.Services
             "stages-summary" => "📊",
             "terminal" => "⌨",
             "pending-change" => "📝",
+            "awaiting-build-fix" => "🩹",
+            "awaiting-manual-fix" => "✋",
             "stage-docs" => "📚",
             _ => "•"
         };

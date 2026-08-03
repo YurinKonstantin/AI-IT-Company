@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="App_Brand.Text" xml:space="preserve"><value>AI IT-Company</value></data>
+  <data name="Nav_Agent.Content" xml:space="preserve"><value>工作室室</value></data>
+  <data name="Nav_Review.Content" xml:space="preserve"><value>审阅</value></data>
+  <data name="Nav_Runs.Content" xml:space="preserve"><value>运行记录</value></data>
+  <data name="Nav_AgentsModels.Content" xml:space="preserve"><value>代理与模型</value></data>
+  <data name="Nav_More.Content" xml:space="preserve"><value>更多</value></data>
+  <data name="Nav_Freelance.Content" xml:space="preserve"><value>自动驾驶</value></data>
+  <data name="Nav_Logs.Content" xml:space="preserve"><value>日志</value></data>
+  <data name="Nav_Help.Content" xml:space="preserve"><value>帮助</value></data>
+  <data name="Nav_Settings.Content" xml:space="preserve"><value>设置</value></data>
+  <data name="Agent_Title.Text" xml:space="preserve"><value>工作室室</value></data>
+  <data name="Studio_Banner.Text" xml:space="preserve"><value>工作室室 — 描述想法，由代理实现。需要时在审阅中 Apply/Reject。</value></data>
+  <data name="Autopilot_Title.Text" xml:space="preserve"><value>自动驾驶（自由职业 + GitHub bounty）</value></data>
+  <data name="Autopilot_Banner.Text" xml:space="preserve"><value>自动驾驶 — 搜寻并评分任务；Accept 仅启动内部流水线（不会在市场上投标）。</value></data>
+  <data name="Agent_ClearTimeline.Content" xml:space="preserve"><value>清空</value></data>
+  <data name="Agent_Side_Run.Text" xml:space="preserve"><value>运行</value></data>
+  <data name="Agent_Side_Progress.Text" xml:space="preserve"><value>进度</value></data>
+  <data name="Agent_OpenFolder.Content" xml:space="preserve"><value>文件夹</value></data>
+  <data name="Agent_RetryStage.Content" xml:space="preserve"><value>重试阶段</value></data>
+  <data name="Agent_BuildFix_Title.Text" xml:space="preserve"><value>构建未修复</value></data>
+  <data name="Agent_BuildFix_Rollback.Content" xml:space="preserve"><value>回滚</value></data>
+  <data name="Agent_BuildFix_Continue.Content" xml:space="preserve"><value>已修复 — 继续</value></data>
+  <data name="Agent_BuildFix_Proceed.Content" xml:space="preserve"><value>带错误继续</value></data>
+  <data name="Agent_OpenReview.Text" xml:space="preserve"><value>审阅更改</value></data>
+  <data name="Agent_Browse.Content" xml:space="preserve"><value>浏览…</value></data>
+  <data name="Agent_ClearAttach.Content" xml:space="preserve"><value>清除</value></data>
+  <data name="Agent_Prompt.PlaceholderText" xml:space="preserve"><value>描述任务…（@file 路径 / @folder 路径）</value></data>
+  <data name="Agent_ProjectPath.PlaceholderText" xml:space="preserve"><value>项目文件夹</value></data>
+  <data name="Agent_Send.Content" xml:space="preserve"><value>发送</value></data>
+  <data name="Agent_Stop.Content" xml:space="preserve"><value>停止</value></data>
+  <data name="Runs_Title.Text" xml:space="preserve"><value>运行记录</value></data>
+  <data name="Runs_Subtitle.Text" xml:space="preserve"><value>会话历史。实时进度在“代理”页面。</value></data>
+  <data name="Runs_OpenAgent.Content" xml:space="preserve"><value>打开代理</value></data>
+  <data name="Runs_History.Text" xml:space="preserve"><value>历史</value></data>
+  <data name="Runs_Refresh.Content" xml:space="preserve"><value>刷新</value></data>
+  <data name="Lab_Tab_Agents.Header" xml:space="preserve"><value>代理</value></data>
+  <data name="Lab_Tab_Models.Header" xml:space="preserve"><value>模型</value></data>
+  <data name="Settings_Title.Text" xml:space="preserve"><value>设置</value></data>
+  <data name="Settings_Tab_Providers.Header" xml:space="preserve"><value>提供商</value></data>
+  <data name="Settings_Tab_Pipeline.Header" xml:space="preserve"><value>流水线</value></data>
+  <data name="Settings_Tab_Language.Header" xml:space="preserve"><value>语言</value></data>
+  <data name="Settings_Tab_Editor.Header" xml:space="preserve"><value>编辑器</value></data>
+  <data name="Settings_Tab_Freelance.Header" xml:space="preserve"><value>自由职业</value></data>
+  <data name="Settings_Tab_Artist.Header" xml:space="preserve"><value>画师</value></data>
+  <data name="Settings_Tab_Templates.Header" xml:space="preserve"><value>模板</value></data>
+  <data name="Settings_Tab_Prompts.Header" xml:space="preserve"><value>提示词</value></data>
+  <data name="Review_Title.Text" xml:space="preserve"><value>审阅（应用 / 拒绝）</value></data>
+  <data name="ModeHint_Auto" xml:space="preserve"><value>自动：由 Interpreter 选择模式。现有代码任务需要文件夹。</value></data>
+  <data name="ModeHint_Create" xml:space="preserve"><value>新建项目。文件夹可选 — 结果写入 Output。</value></data>
+  <data name="ModeHint_Improve" xml:space="preserve"><value>改进：选择现有项目文件夹。在“审阅”中查看差异。</value></data>
+  <data name="ModeHint_Fix" xml:space="preserve"><value>修复错误：需要项目文件夹。失败时查看 build_log。</value></data>
+  <data name="ModeHint_Document" xml:space="preserve"><value>文档：需要文件夹。生成 README / ARCHITECTURE，不改写代码。</value></data>
+  <data name="ModeHint_Analyze" xml:space="preserve"><value>分析：需要文件夹。结果为 ANALYSIS.md，不修改代码。</value></data>
+  <data name="ModeHint_Plan" xml:space="preserve"><value>仅计划：不生成代码 — TZ.md 与架构计划。</value></data>
+  <data name="Timeline_You" xml:space="preserve"><value>你</value></data>
+  <data name="Settings_UiLanguageSaved" xml:space="preserve"><value>界面语言已保存。请重启应用以刷新所有界面字符串。</value></data>
+</root>

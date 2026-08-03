@@ -17,6 +17,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<FreelanceOutcomeRecord> FreelanceOutcomes => Set<FreelanceOutcomeRecord>();
     public DbSet<FreelanceSkillStatRecord> FreelanceSkillStats => Set<FreelanceSkillStatRecord>();
     public DbSet<FreelanceAuditRecord> FreelanceAudits => Set<FreelanceAuditRecord>();
+    public DbSet<CorrectionLessonRecord> CorrectionLessons => Set<CorrectionLessonRecord>();
 
     public AppDbContext() { }
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
@@ -47,7 +48,26 @@ public sealed class AppDbContext : DbContext
         mb.Entity<FreelanceOutcomeRecord>().HasKey(x => x.Id);
         mb.Entity<FreelanceSkillStatRecord>().HasKey(x => x.Tag);
         mb.Entity<FreelanceAuditRecord>().HasKey(x => x.Id);
+        mb.Entity<CorrectionLessonRecord>().HasKey(x => x.Id);
+        mb.Entity<CorrectionLessonRecord>().HasIndex(x => x.Role);
+        mb.Entity<CorrectionLessonRecord>().HasIndex(x => x.Enabled);
     }
+}
+
+public class CorrectionLessonRecord
+{
+    public string Id { get; set; } = "";
+    /// <summary>AgentRole name or "Any".</summary>
+    public string Role { get; set; } = "Any";
+    /// <summary>BuildError | CodeReject | ManualTeach</summary>
+    public string Kind { get; set; } = "ManualTeach";
+    public string WrongSummary { get; set; } = "";
+    public string CorrectGuidance { get; set; } = "";
+    public string ContextSnippet { get; set; } = "";
+    public string Tags { get; set; } = "";
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public int UseCount { get; set; }
+    public bool Enabled { get; set; } = true;
 }
 
 public class ProjectRecord

@@ -184,6 +184,37 @@ namespace Ai
             }
         }
 
+        /// <summary>Create a derived model from a Modelfile: POST /api/create</summary>
+        public async IAsyncEnumerable<PullProgress> CreateFromModelfileAsync(
+            string modelName,
+            string modelfile,
+            [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var body = new { name = modelName, modelfile, stream = true };
+            using var req = new HttpRequestMessage(HttpMethod.Post, "/api/create")
+            {
+                Content = JsonContent.Create(body)
+            };
+            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            resp.EnsureSuccessStatusCode();
+
+            using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var reader = new StreamReader(stream);
+
+            while (!reader.EndOfStream)
+            {
+                ct.ThrowIfCancellationRequested();
+                var line = await reader.ReadLineAsync(ct);
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                PullProgress? p = null;
+                try { p = JsonSerializer.Deserialize<PullProgress>(line); }
+                catch { }
+
+                if (p is not null) yield return p;
+            }
+        }
+
         // ---------- DTO ----------
 
         private sealed class TagsResponse

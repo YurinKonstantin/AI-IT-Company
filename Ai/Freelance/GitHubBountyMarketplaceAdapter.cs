@@ -110,6 +110,80 @@ public sealed class GitHubBountyMarketplaceAdapter : IFreelanceMarketplace, IDis
         return found.FirstOrDefault(o => o.ExternalId == externalId);
     }
 
+    /// <summary>
+    /// Posts a draft comment on the GitHub issue. Requires PAT. Never called unless UI opt-in is on.
+    /// </summary>
+    public async Task<(bool Ok, string Message)> PostDraftCommentAsync(
+        FreelanceJobOffer offer, string body, CancellationToken ct = default)
+    {
+        if (!_creds.HasSecret(WindowsCredentialStore.GitHubPatResource))
+            return (false, "GitHub PAT not set");
+
+        if (!TryParseIssue(offer, out var owner, out var repo, out var number))
+            return (false, "Cannot parse owner/repo/issue from offer URL or RawJson");
+
+        ApplyAuth();
+        var payload = JsonSerializer.Serialize(new { body });
+        using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync(
+            $"repos/{owner}/{repo}/issues/{number}/comments", content, ct);
+
+        var text = await resp.Content.ReadAsStringAsync(ct);
+        if (!resp.IsSuccessStatusCode)
+            return (false, $"GitHub comment HTTP {(int)resp.StatusCode}: {Truncate(text, 300)}");
+
+        return (true, $"Draft comment posted on {owner}/{repo}#{number}");
+    }
+
+    private static bool TryParseIssue(
+        FreelanceJobOffer offer, out string owner, out string repo, out int number)
+    {
+        owner = "";
+        repo = "";
+        number = 0;
+
+        // From html_url: https://github.com/owner/repo/issues/123
+        if (!string.IsNullOrWhiteSpace(offer.Url))
+        {
+            var m = Regex.Match(offer.Url,
+                @"github\.com/(?<owner>[^/]+)/(?<repo>[^/]+)/issues/(?<num>\d+)",
+                RegexOptions.IgnoreCase);
+            if (m.Success
+                && int.TryParse(m.Groups["num"].Value, out number))
+            {
+                owner = m.Groups["owner"].Value;
+                repo = m.Groups["repo"].Value;
+                return true;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(offer.RawJson)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(offer.RawJson);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("number", out var numEl))
+                number = numEl.GetInt32();
+
+            if (root.TryGetProperty("repository_url", out var ru)
+                && ru.GetString() is { } repoUrl)
+            {
+                var parts = repoUrl.TrimEnd('/').Split('/');
+                if (parts.Length >= 2)
+                {
+                    owner = parts[^2];
+                    repo = parts[^1];
+                }
+            }
+
+            return !string.IsNullOrEmpty(owner) && !string.IsNullOrEmpty(repo) && number > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void ApplyAuth()
     {
         _http.DefaultRequestHeaders.Authorization = null;
